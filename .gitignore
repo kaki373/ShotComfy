@@ -1,0 +1,21 @@
+# --- ShotComfy ---
+# local machine config (copy from config.example.json)
+config.json
+
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# logs / scratch
+*.log
+.cache/
+
+# demo / test data
+/sandbox/
+/sandbox_project/

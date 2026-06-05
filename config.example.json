@@ -1,0 +1,19 @@
+{
+  "comfyui": {
+    "base_url": "http://127.0.0.1:8188",
+    "install_path": "D:/webui/ComfyUI/ComfyUI",
+    "output_dir": "D:/webui/ComfyUI/output"
+  },
+  "mode": "free",
+  "free": {
+    "folder": "D:/webui/ShotComfy/sandbox"
+  },
+  "project": {
+    "root": "D:/webui/Projects/XXX",
+    "code": "XXX"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8799
+  }
+}
