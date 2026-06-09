@@ -29,6 +29,14 @@ function TreeRow({ node, depth, expanded, toggle, openIds, activeId, onOpen }: R
         className={`tree-row${isActive ? " active" : ""}${isOpened ? " opened" : ""}`}
         style={{ paddingLeft: 6 + depth * 14 }}
         onClick={onRowClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          window.dispatchEvent(
+            new CustomEvent("sc:treectx", {
+              detail: { x: e.clientX, y: e.clientY, path: node.path, name: node.name },
+            }),
+          );
+        }}
         title={node.path}
       >
         <span

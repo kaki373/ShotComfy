@@ -55,6 +55,19 @@ const SOURCE_LABEL: Record<string, string> = {
   ae: "AE", premiere: "Pr", ame: "AME",
 };
 
+// middle-truncate a long filename so the meaningful suffix (_gen1, _dpt) and the
+// extension stay visible — "CIN_01A_048_For…_gen1.png" rather than "CIN_01A_048_For…"
+function smartName(name: string, max = 52): string {
+  if (name.length <= max) return name;
+  const dot = name.lastIndexOf(".");
+  const ext = dot > 0 ? name.slice(dot) : "";
+  const base = ext ? name.slice(0, -ext.length) : name;
+  const tail = Math.min(12, Math.max(0, base.length - 4));
+  const head = max - ext.length - tail - 1;
+  if (head < 4) return name.slice(0, Math.max(1, max - 1)) + "…";
+  return base.slice(0, head) + "…" + base.slice(base.length - tail) + ext;
+}
+
 export function AssetNode({ data, selected }: NodeProps<AssetNodeType>) {
   const { asset, kind } = data;
   const [vidErr, setVidErr] = useState(false); // ProRes/.mov can't play in the browser
@@ -126,15 +139,15 @@ export function AssetNode({ data, selected }: NodeProps<AssetNodeType>) {
         {asset.kind !== "image" && asset.kind !== "video" && (
           <div className="asset-other">{asset.name.split(".").pop()?.toUpperCase()}</div>
         )}
+        {c2paSummary && (
+          <div className="c2pa-line" title={c2paFull}>
+            🔏 {c2paSummary}
+          </div>
+        )}
       </div>
       <div className="asset-name" title={asset.name}>
-        {asset.name}
+        {smartName(asset.name)}
       </div>
-      {c2paSummary && (
-        <div className="c2pa-line" title={c2paFull}>
-          🔏 {c2paSummary}
-        </div>
-      )}
       {data.labels && data.labels.length > 0 && (
         <div className="label-row">
           {data.labels.map((l) => (

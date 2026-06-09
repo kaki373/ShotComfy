@@ -19,3 +19,6 @@ frontend/.vite/
 # demo / test data
 /sandbox/
 /sandbox_project/
+
+# auto-generated API-format workflow caches (regenerated from the UI .json sources)
+workflows/*_api.json

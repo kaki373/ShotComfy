@@ -64,6 +64,47 @@ export const queueBoards = (board_ids: string[], workflow = "default") =>
     body: JSON.stringify({ board_ids, workflow }),
   }).then(json<QueueResp>);
 
+export interface WorkflowSlot {
+  node_id: string;
+  title: string;
+  kind: "image" | "video";
+}
+export interface WorkflowInfo {
+  name: string;
+  slots: WorkflowSlot[];
+  api: boolean; // true = runnable API format; false = UI format, needs conversion
+}
+export const getWorkflows = () => fetch("/api/workflows").then(json<WorkflowInfo[]>);
+
+export const openWorkflowsFolder = () =>
+  fetch("/api/workflows/open", { method: "POST" }).then(json<{ ok: boolean; path: string }>);
+
+export const purgeOld = (path: string) =>
+  fetch("/api/old/purge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  }).then(json<{ ok: boolean; removed: string[]; count: number }>);
+
+export const convertWorkflow = (name: string) =>
+  fetch("/api/workflows/convert", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  }).then(json<{ ok: boolean; name: string; slots: WorkflowSlot[] }>);
+
+export interface JobSpec {
+  board_id: string;
+  slots: Record<string, string>; // node_id -> file path
+  attr?: string;
+}
+export const runJobs = (workflow: string, jobs: JobSpec[]) =>
+  fetch("/api/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workflow, jobs }),
+  }).then(json<QueueResp>);
+
 export interface SavedAsset {
   name: string;
   path: string;
@@ -139,6 +180,43 @@ export interface Lineage {
   edges: LineageEdge[];
 }
 export const getLineage = (id: string) => fetch(`/api/lineage/${id}`).then(json<Lineage>);
+
+// ---- file operations (right-click menu) ----
+interface FileOpResp {
+  ok: boolean;
+  path?: string;
+  name?: string;
+}
+const postJson = <T>(url: string, body: unknown) =>
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(json<T>);
+
+export const fileDuplicate = (path: string) => postJson<FileOpResp>("/api/file/duplicate", { path });
+export const fileRename = (path: string, name: string) =>
+  postJson<FileOpResp>("/api/file/rename", { path, name });
+export const fileConvert = (path: string, format: "jpg" | "png") =>
+  postJson<FileOpResp>("/api/file/convert", { path, format });
+export const folderCreate = (parent: string, name: string) =>
+  postJson<FileOpResp>("/api/folder/create", { parent, name });
+export const fileMove = (path: string, dest: string) =>
+  postJson<FileOpResp>("/api/file/move", { path, dest });
+// soft-delete: move into an "old/" subfolder (recoverable); returns where it went
+export const fileToOld = (path: string) =>
+  postJson<{ ok: boolean; original: string; moved: string }>("/api/file/old", { path });
+// undo: move it back from `src` to its original `path`
+export const fileRestore = (path: string, src: string) =>
+  postJson<FileOpResp>("/api/file/restore", { path, src });
+// PERMANENT delete (frontend confirms first)
+export const fileDelete = (path: string) => postJson<FileOpResp>("/api/file/delete", { path });
+// extract first/last frame of a video as a PNG still
+export const videoFrame = (path: string, position: "first" | "last") =>
+  postJson<FileOpResp>("/api/video/frame", { path, position });
+// pull the embedded ComfyUI workflow out of a PNG into the workflows folder
+export const workflowFromImage = (path: string, name?: string) =>
+  postJson<{ ok: boolean; name: string; files: string[] }>("/api/workflows/from-image", { path, name });
 
 export const revealPath = (path: string) =>
   fetch("/api/reveal", {

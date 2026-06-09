@@ -21,12 +21,24 @@ import {
 } from "@xyflow/react";
 import { AssetNode, BoardLabelNode, type AssetNodeData } from "./nodes/AssetNode";
 import { CompareOverlay } from "./components/CompareOverlay";
+import { Lightbox } from "./components/Lightbox";
+import JobBuilder, { type SelItem } from "./components/JobBuilder";
 import { TreeView } from "./components/TreeView";
 import { layoutConnected, NODE_H, NODE_W } from "./layout";
 import {
-  assetUrl,
   expandWorkflow,
+  fileConvert,
+  fileDelete,
+  fileDuplicate,
+  fileMove,
+  fileRename,
+  fileRestore,
+  fileToOld,
+  folderCreate,
   getBoard,
+  purgeOld,
+  videoFrame,
+  workflowFromImage,
   getComfyStatus,
   getConfig,
   getLineage,
@@ -34,7 +46,6 @@ import {
   getTree,
   openFolder,
   pickFolder,
-  queueBoards,
   revealPath,
   setMode,
   setTag,
@@ -45,11 +56,32 @@ import {
   type ConfigT,
   type FileTag,
   type Lineage,
-  type QueueResp,
   type TreeNode,
 } from "./api";
 
 const nodeTypes = { asset: AssetNode, boardLabel: BoardLabelNode };
+
+// recursive folder list for the "move to folder" picker
+function MoveRows({
+  node,
+  depth,
+  onPick,
+}: {
+  node: TreeNode;
+  depth: number;
+  onPick: (path: string) => void;
+}) {
+  return (
+    <>
+      <button className="move-row" style={{ paddingLeft: 8 + depth * 14 }} onClick={() => onPick(node.path)}>
+        📁 {node.name || "/"}
+      </button>
+      {node.children.map((c) => (
+        <MoveRows key={c.path} node={c} depth={depth + 1} onPick={onPick} />
+      ))}
+    </>
+  );
+}
 
 const COL_W = 340;
 const ROW_H = 260;
@@ -208,6 +240,36 @@ function groupSiblings(assets: AssetT[], sourceOf: (a: AssetT) => string): Asset
 }
 
 type GenFilter = "all" | "gen" | "nongen";
+
+// persisted canvas-toolbar settings (top-left toggles + ⚙ spacing)
+const SETTINGS_KEY = "shotcomfy.settings";
+interface Settings {
+  genFilter: GenFilter;
+  treesByTime: boolean;
+  continuous: boolean;
+  showTags: boolean;
+  gridCols: number;
+  gapX: number;
+  gapY: number;
+}
+const DEFAULT_SETTINGS: Settings = {
+  genFilter: "all",
+  treesByTime: false,
+  continuous: false,
+  showTags: true,
+  gridCols: 4,
+  gapX: 12,
+  gapY: 12,
+};
+function loadSettings(): Settings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) } : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
 interface LayoutOpts {
   treesByTime: boolean;
   genFilter: GenFilter; // all / generated-only / non-generated-only (PSD always shown)
@@ -419,27 +481,43 @@ export function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selected, setSelected] = useState<Node[]>([]);
-  const [queueResp, setQueueResp] = useState<QueueResp | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [treesByTime, setTreesByTime] = useState(false);
-  const treesByTimeRef = useRef(false);
-  const [genFilter, setGenFilter] = useState<GenFilter>("all");
-  const genFilterRef = useRef<GenFilter>("all");
+  const S0 = useRef(loadSettings()).current; // saved toolbar settings (read once)
+  const [treesByTime, setTreesByTime] = useState(S0.treesByTime);
+  const treesByTimeRef = useRef(S0.treesByTime);
+  const [genFilter, setGenFilter] = useState<GenFilter>(S0.genFilter);
+  const genFilterRef = useRef<GenFilter>(S0.genFilter);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [treeMenu, setTreeMenu] = useState<{ x: number; y: number; path: string; name: string } | null>(null);
+  const [movePicker, setMovePicker] = useState<{ items: { asset: AssetT; boardId: string }[] } | null>(null);
+  const undoRef = useRef<{ boardId: string; original: string; moved: string }[][]>([]);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [viewer, setViewer] = useState<AssetT | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [showTags, setShowTags] = useState(true);
-  const [continuous, setContinuous] = useState(false);
-  const continuousRef = useRef(false);
-  const [gridCols, setGridCols] = useState(4);
-  const gridColsRef = useRef(4);
-  const [gapX, setGapX] = useState(12);
-  const gapXRef = useRef(12);
-  const [gapY, setGapY] = useState(12);
-  const gapYRef = useRef(12);
+  const [showTags, setShowTags] = useState(S0.showTags);
+  const [continuous, setContinuous] = useState(S0.continuous);
+  const continuousRef = useRef(S0.continuous);
+  const [gridCols, setGridCols] = useState(S0.gridCols);
+  const gridColsRef = useRef(S0.gridCols);
+  const [gapX, setGapX] = useState(S0.gapX);
+  const gapXRef = useRef(S0.gapX);
+  const [gapY, setGapY] = useState(S0.gapY);
+  const gapYRef = useRef(S0.gapY);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // persist toolbar toggles + spacing across app restarts
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SETTINGS_KEY,
+        JSON.stringify({ genFilter, treesByTime, continuous, showTags, gridCols, gapX, gapY }),
+      );
+    } catch {
+      /* ignore storage quota */
+    }
+  }, [genFilter, treesByTime, continuous, showTags, gridCols, gapX, gapY]);
+
   const dataCacheRef = useRef<
     Map<string, { board: BoardDetail; lineage: Lineage | null; tags: Record<string, FileTag> }>
   >(new Map());
@@ -533,6 +611,30 @@ export function App() {
     [openIds, relayoutAll],
   );
 
+  // re-fetch every open board (manual refresh button) — folder scans on a network
+  // drive are slow, so a one-shot refresh keeps the canvas accurate on demand
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshAllOpen = useCallback(async () => {
+    if (!openIds.length) return;
+    setRefreshing(true);
+    try {
+      await Promise.all(
+        openIds.map(async (id) => {
+          const [board, lineage, tags] = await Promise.all([
+            getBoard(id),
+            getLineage(id).catch(() => null),
+            getTags(id).catch(() => ({})),
+          ]);
+          dataCacheRef.current.set(id, { board, lineage, tags });
+        }),
+      );
+      relayoutAll();
+      getTree().then(setTree).catch(() => {});
+    } finally {
+      setRefreshing(false);
+    }
+  }, [openIds, relayoutAll]);
+
   const onToggleTreesByTime = useCallback(
     (v: boolean) => {
       setTreesByTime(v);
@@ -580,8 +682,17 @@ export function App() {
     [relayoutAll, rf],
   );
 
+  // preserve click order: keep previously-selected nodes in their order, append newly added
+  // ones (React Flow reports selection in node-array order, not the order the user clicked).
   const onSelectionChange = useCallback((p: OnSelectionChangeParams) => {
-    setSelected(p.nodes.filter((n) => n.type === "asset"));
+    const assetNodes = p.nodes.filter((n) => n.type === "asset");
+    setSelected((prev) => {
+      const now = new Map(assetNodes.map((n) => [n.id, n]));
+      const kept = prev.filter((n) => now.has(n.id)).map((n) => now.get(n.id)!);
+      const keptIds = new Set(kept.map((n) => n.id));
+      const added = assetNodes.filter((n) => !keptIds.has(n.id));
+      return [...kept, ...added];
+    });
   }, []);
 
   const reveal = useCallback((path: string) => {
@@ -592,6 +703,187 @@ export function App() {
     setNotice(msg);
     setTimeout(() => setNotice(null), 4000);
   }, []);
+
+  // run a file operation, then refresh the affected board + folder tree
+  const runFileOp = useCallback(
+    async (boardId: string, label: string, op: () => Promise<{ name?: string }>) => {
+      try {
+        const r = await op();
+        await refreshBoard(boardId);
+        getTree().then(setTree).catch(() => {});
+        setNotice(`${label}：${r.name ?? "完了"}`);
+        setTimeout(() => setNotice(null), 3000);
+      } catch (e) {
+        window.alert(`${label}に失敗: ${e}`);
+      }
+    },
+    [refreshBoard],
+  );
+
+
+  // remove asset nodes from the canvas immediately (optimistic) by file path
+  const removeNodesByPath = useCallback(
+    (paths: Set<string>) =>
+      setNodes((ns) =>
+        ns.filter((n) => {
+          const a = (n.data as AssetNodeData)?.asset;
+          return !(n.type === "asset" && a && paths.has(a.path));
+        }),
+      ),
+    [setNodes],
+  );
+
+  // soft-delete: move into an "old/" folder (recoverable) + Ctrl+Z undo
+  const sendToOld = useCallback(
+    async (entries: { boardId: string; path: string }[]) => {
+      if (!entries.length) return;
+      const batch: { boardId: string; original: string; moved: string }[] = [];
+      for (const e of entries) {
+        try {
+          const r = await fileToOld(e.path);
+          batch.push({ boardId: e.boardId, original: r.original, moved: r.moved });
+        } catch {
+          /* skip */
+        }
+      }
+      if (!batch.length) return;
+      undoRef.current.push(batch);
+      removeNodesByPath(new Set(batch.map((b) => b.original)));
+      for (const b of [...new Set(batch.map((x) => x.boardId))]) await refreshBoard(b);
+      getTree().then(setTree).catch(() => {});
+      setSelected([]);
+      showNotice(`${batch.length}件を old に送りました（Ctrl+Z で戻せます）`);
+    },
+    [refreshBoard, removeNodesByPath, showNotice],
+  );
+
+  const sendSelectedToOld = useCallback(() => {
+    sendToOld(
+      selected.map((n) => {
+        const d = n.data as AssetNodeData;
+        return { boardId: d.boardId, path: d.asset.path };
+      }),
+    );
+  }, [selected, sendToOld]);
+
+  const undoOld = useCallback(async () => {
+    const batch = undoRef.current.pop();
+    if (!batch) return;
+    let n = 0;
+    for (const it of batch) {
+      try {
+        await fileRestore(it.original, it.moved);
+        n++;
+      } catch {
+        /* skip */
+      }
+    }
+    for (const b of [...new Set(batch.map((x) => x.boardId))]) await refreshBoard(b);
+    getTree().then(setTree).catch(() => {});
+    showNotice(n ? `${n}件を戻しました` : "戻せませんでした");
+  }, [refreshBoard, showNotice]);
+
+  const deletePermanentPaths = useCallback(
+    async (items: { boardId: string; path: string; name: string }[]) => {
+      if (!items.length) return;
+      const msg =
+        items.length === 1
+          ? `「${items[0].name}」を完全に削除します。`
+          : `選択した ${items.length} 件を完全に削除します。`;
+      if (!window.confirm(`${msg}\n元に戻せません。よろしいですか？`)) return;
+      const removed = new Set<string>();
+      const boards = new Set<string>();
+      for (const it of items) {
+        try {
+          await fileDelete(it.path);
+          removed.add(it.path);
+          boards.add(it.boardId);
+        } catch {
+          /* skip */
+        }
+      }
+      removeNodesByPath(removed);
+      for (const b of boards) await refreshBoard(b);
+      getTree().then(setTree).catch(() => {});
+      setSelected([]);
+      showNotice(`${removed.size}件を完全に削除しました`);
+    },
+    [refreshBoard, removeNodesByPath, showNotice],
+  );
+
+  // a right-click acts on the whole selection if the clicked node is part of it
+  const menuTargets = useCallback(
+    (m: MenuState): { asset: AssetT; boardId: string }[] => {
+      const inSel = selected.some((n) => (n.data as AssetNodeData).asset.path === m.asset.path);
+      if (inSel && selected.length > 1)
+        return selected.map((n) => {
+          const d = n.data as AssetNodeData;
+          return { asset: d.asset, boardId: d.boardId };
+        });
+      return [{ asset: m.asset, boardId: m.boardId }];
+    },
+    [selected],
+  );
+
+  const pickMove = useCallback(
+    async (destPath: string) => {
+      if (!movePicker) return;
+      const items = movePicker.items;
+      setMovePicker(null);
+      const moved: string[] = [];
+      const boards = new Set<string>();
+      for (const it of items) {
+        try {
+          await fileMove(it.asset.path, destPath);
+          moved.push(it.asset.path);
+          boards.add(it.boardId);
+        } catch {
+          /* skip individual failures */
+        }
+      }
+      try {
+        removeNodesByPath(new Set(moved));
+        for (const b of boards) await refreshBoard(b);
+        getTree().then(setTree).catch(() => {});
+        setSelected([]);
+        showNotice(`${moved.length}件を移動しました`);
+      } catch (e) {
+        window.alert(`移動に失敗: ${e}`);
+      }
+    },
+    [movePicker, refreshBoard, removeNodesByPath, showNotice],
+  );
+
+  // tree right-click menu (folder operations)
+  useEffect(() => {
+    const h = (e: Event) => setTreeMenu((e as CustomEvent).detail);
+    window.addEventListener("sc:treectx", h);
+    return () => window.removeEventListener("sc:treectx", h);
+  }, []);
+  useEffect(() => {
+    if (!treeMenu) return;
+    const close = () => setTreeMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [treeMenu]);
+
+  // Delete = trash selected; Ctrl/Cmd+Z = undo (ignored while typing in inputs)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "Delete" && selected.length && !viewer) {
+        e.preventDefault();
+        sendSelectedToOld();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undoOld();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected, sendSelectedToOld, undoOld, viewer]);
+
 
   const onExpandWorkflow = useCallback(
     async (path: string) => {
@@ -626,6 +918,8 @@ export function App() {
         setViewer(null);
         setMenu(null);
         setEditor(null);
+        setTreeMenu(null);
+        setMovePicker(null);
       }
     };
     window.addEventListener("sc:view", onView);
@@ -648,11 +942,14 @@ export function App() {
     [refreshBoard],
   );
 
-  const selectedBoardIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const n of selected) ids.add((n.data as AssetNodeData).boardId);
-    return [...ids];
-  }, [selected]);
+  const selItems = useMemo<SelItem[]>(
+    () =>
+      selected.map((n) => {
+        const d = n.data as AssetNodeData;
+        return { asset: d.asset, boardId: d.boardId };
+      }),
+    [selected],
+  );
 
   const compareImages = useMemo(() => {
     const imgs = selected
@@ -661,20 +958,15 @@ export function App() {
     return imgs.length === 2 ? (imgs as [AssetT, AssetT]) : null;
   }, [selected]);
 
-  const onQueue = useCallback(async () => {
-    if (selectedBoardIds.length === 0) return;
-    setBusy(true);
-    setQueueResp(null);
-    try {
-      const r = await queueBoards(selectedBoardIds, "default");
-      setQueueResp(r);
-      for (const id of selectedBoardIds) await refreshBoard(id);
-    } catch (e) {
-      setQueueResp({ workflow: "default", results: [{ board: "?", error: String(e) }] });
-    } finally {
-      setBusy(false);
-    }
-  }, [selectedBoardIds, refreshBoard]);
+  // ordered viewable media on the canvas, for ←/→ navigation in the lightbox
+  const viewerList = useMemo<AssetT[]>(
+    () =>
+      nodes
+        .filter((n) => n.type === "asset")
+        .map((n) => (n.data as AssetNodeData).asset)
+        .filter((a) => a.kind === "image" || a.kind === "video"),
+    [nodes],
+  );
 
   const onChangeFolder = useCallback(async () => {
     let chosen: string | null = null;
@@ -773,8 +1065,12 @@ export function App() {
           ComfyUI {comfy ? (comfy.online ? "online" : "offline") : "…"}
         </span>
         <div className="spacer" />
-        <button className="queue-btn" disabled={busy || selectedBoardIds.length === 0} onClick={onQueue}>
-          {busy ? "Generating…" : `Queue selected → ComfyUI (${selectedBoardIds.length})`}
+        <button
+          className={`queue-btn ${builderOpen ? "on" : ""}`}
+          onClick={() => setBuilderOpen((v) => !v)}
+          title="選択画像をi2i/V2Vワークフローで生成"
+        >
+          ▶ ComfyUIで生成{selected.length ? ` (${selected.length}選択中)` : ""}
         </button>
       </header>
 
@@ -806,6 +1102,7 @@ export function App() {
             onPaneClick={() => setMenu(null)}
             nodeTypes={nodeTypes}
             selectionKeyCode="Shift"
+            deleteKeyCode={null}
             zoomOnDoubleClick={false}
             fitView
           >
@@ -874,9 +1171,19 @@ export function App() {
               />
               出自カラー
             </label>
-            <button className="tool-btn" onClick={() => setSettingsOpen((o) => !o)}>
-              ⚙ 間隔
-            </button>
+            <div className="tool-row">
+              <button
+                className="tool-btn"
+                onClick={refreshAllOpen}
+                disabled={refreshing}
+                title="表示を最新に更新（複製・削除・移動などをすぐ反映）"
+              >
+                {refreshing ? "⏳ 更新中" : "🔄 更新"}
+              </button>
+              <button className="tool-btn" onClick={() => setSettingsOpen((o) => !o)}>
+                ⚙ 間隔
+              </button>
+            </div>
           </div>
 
           {settingsOpen && (
@@ -934,6 +1241,19 @@ export function App() {
                   🧩 ワークフローをComfyUIに展開
                 </button>
               )}
+              {menu.source === "comfyui" && (
+                <button
+                  onClick={() => {
+                    const a = menu.asset;
+                    workflowFromImage(a.path)
+                      .then((r) => showNotice(`ワークフロー抽出：${r.files.join(" / ")}`))
+                      .catch((e) => window.alert(`抽出に失敗: ${e}`));
+                    setMenu(null);
+                  }}
+                >
+                  🧩 ワークフローを抽出（workflowsへ）
+                </button>
+              )}
               <button
                 onClick={() => {
                   applyTag(menu.boardId, menu.asset.name, { ok: !menu.ok });
@@ -956,6 +1276,203 @@ export function App() {
               >
                 🏷 属性を設定…
               </button>
+
+              <div className="ctx-div" />
+              <button
+                onClick={() => {
+                  runFileOp(menu.boardId, "複製", () => fileDuplicate(menu.asset.path));
+                  setMenu(null);
+                }}
+              >
+                📄 複製
+              </button>
+              <button
+                onClick={() => {
+                  const nn = window.prompt("新しいファイル名", menu.asset.name);
+                  if (nn) runFileOp(menu.boardId, "名前変更", () => fileRename(menu.asset.path, nn));
+                  setMenu(null);
+                }}
+              >
+                ✏️ 名前を変更…
+              </button>
+              {(menu.asset.kind === "image" || /\.ps[bd]$/i.test(menu.asset.name)) && (
+                <div className="ctx-row">
+                  <span className="ctx-row-label">🖼 変換</span>
+                  <button
+                    className="ctx-inline"
+                    onClick={() => {
+                      runFileOp(menu.boardId, "JPG変換", () => fileConvert(menu.asset.path, "jpg"));
+                      setMenu(null);
+                    }}
+                  >
+                    JPG
+                  </button>
+                  <button
+                    className="ctx-inline"
+                    onClick={() => {
+                      runFileOp(menu.boardId, "PNG変換", () => fileConvert(menu.asset.path, "png"));
+                      setMenu(null);
+                    }}
+                  >
+                    PNG
+                  </button>
+                </div>
+              )}
+              {menu.asset.kind === "video" && (
+                <div className="ctx-row">
+                  <span className="ctx-row-label">🎬 フレーム</span>
+                  <button
+                    className="ctx-inline"
+                    onClick={() => {
+                      runFileOp(menu.boardId, "先頭フレーム", () => videoFrame(menu.asset.path, "first"));
+                      setMenu(null);
+                    }}
+                  >
+                    先頭
+                  </button>
+                  <button
+                    className="ctx-inline"
+                    onClick={() => {
+                      runFileOp(menu.boardId, "末尾フレーム", () => videoFrame(menu.asset.path, "last"));
+                      setMenu(null);
+                    }}
+                  >
+                    末尾
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  setMovePicker({ items: menuTargets(menu) });
+                  setMenu(null);
+                }}
+              >
+                📦 フォルダへ移動…{(() => {
+                  const n = menuTargets(menu).length;
+                  return n > 1 ? `（${n}件）` : "";
+                })()}
+              </button>
+              <button
+                onClick={() => {
+                  sendToOld(menuTargets(menu).map((t) => ({ boardId: t.boardId, path: t.asset.path })));
+                  setMenu(null);
+                }}
+              >
+                🗄 old に送る{(() => {
+                  const n = menuTargets(menu).length;
+                  return n > 1 ? `（${n}件）` : "";
+                })()}
+              </button>
+              <button
+                className="ctx-del"
+                onClick={() => {
+                  deletePermanentPaths(
+                    menuTargets(menu).map((t) => ({
+                      boardId: t.boardId,
+                      path: t.asset.path,
+                      name: t.asset.name,
+                    })),
+                  );
+                  setMenu(null);
+                }}
+              >
+                🗑 完全に削除…{(() => {
+                  const n = menuTargets(menu).length;
+                  return n > 1 ? `（${n}件）` : "";
+                })()}
+              </button>
+            </div>
+          )}
+
+          {treeMenu && (
+            <div className="context-menu" style={{ left: treeMenu.x, top: treeMenu.y }}>
+              <button
+                onClick={() => {
+                  const fn = window.prompt(`「${treeMenu.name || "/"}」内に作る新しいフォルダ名`);
+                  if (fn)
+                    folderCreate(treeMenu.path, fn)
+                      .then(() => getTree().then(setTree))
+                      .catch((e) => window.alert(`フォルダ作成に失敗: ${e}`));
+                  setTreeMenu(null);
+                }}
+              >
+                📁 フォルダを作成…
+              </button>
+              <button
+                onClick={() => {
+                  reveal(treeMenu.path);
+                  setTreeMenu(null);
+                }}
+              >
+                📂 エクスプローラで開く
+              </button>
+              <div className="ctx-div" />
+              <button
+                onClick={() => {
+                  sendToOld([{ boardId: "", path: treeMenu.path }]);
+                  setTreeMenu(null);
+                }}
+              >
+                🗄 old に送る
+              </button>
+              <button
+                className="ctx-del"
+                onClick={() => {
+                  deletePermanentPaths([
+                    { boardId: "", path: treeMenu.path, name: treeMenu.name || "このフォルダ" },
+                  ]);
+                  setTreeMenu(null);
+                }}
+              >
+                🗑 完全に削除…
+              </button>
+              {tree && treeMenu.path === tree.path && (
+                <>
+                  <div className="ctx-div" />
+                  <button
+                    className="ctx-del"
+                    onClick={() => {
+                      const root = treeMenu.path;
+                      if (
+                        window.confirm(
+                          "配下のすべての「old」フォルダを完全に削除します。\n中身は元に戻せません。よろしいですか？",
+                        )
+                      ) {
+                        purgeOld(root)
+                          .then((r) => {
+                            showNotice(`old フォルダ ${r.count} 個を削除しました`);
+                            getTree().then(setTree).catch(() => {});
+                            refreshAllOpen();
+                          })
+                          .catch((e) => window.alert(`削除に失敗: ${e}`));
+                      }
+                      setTreeMenu(null);
+                    }}
+                  >
+                    🧹 すべての old フォルダを削除…
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {movePicker && tree && (
+            <div className="tag-editor-backdrop" onClick={() => setMovePicker(null)}>
+              <div className="move-picker" onClick={(e) => e.stopPropagation()}>
+                <div className="te-title">
+                📦{" "}
+                {movePicker.items.length === 1
+                  ? `「${movePicker.items[0].asset.name}」`
+                  : `${movePicker.items.length} 件`}
+                の移動先フォルダ
+              </div>
+                <div className="move-tree">
+                  <MoveRows node={tree} depth={0} onPick={pickMove} />
+                </div>
+                <div className="te-actions">
+                  <button onClick={() => setMovePicker(null)}>キャンセル</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1009,14 +1526,8 @@ export function App() {
 
           {dragging && <div className="drop-hint">画像をドロップして配置</div>}
 
-          {compareImages && (
+          {compareImages && !builderOpen && (
             <CompareOverlay a={compareImages[0]} b={compareImages[1]} onClose={() => setSelected([])} />
-          )}
-
-          {queueResp && (
-            <div className="toast" onClick={() => setQueueResp(null)}>
-              <pre>{JSON.stringify(queueResp, null, 2)}</pre>
-            </div>
           )}
 
           {notice && (
@@ -1026,24 +1537,21 @@ export function App() {
           )}
 
           {viewer && (
-            <div className="lightbox" onClick={() => setViewer(null)}>
-              {viewer.kind === "video" ? (
-                <video
-                  src={assetUrl(viewer.path)}
-                  controls
-                  autoPlay
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <img
-                  src={assetUrl(viewer.path)}
-                  alt={viewer.name}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              )}
-              <div className="lightbox-name">{viewer.name}</div>
-            </div>
+            <Lightbox
+              items={viewerList.some((a) => a.path === viewer.path) ? viewerList : [viewer]}
+              current={viewer}
+              onSelect={setViewer}
+              onClose={() => setViewer(null)}
+            />
           )}
+
+          <JobBuilder
+            open={builderOpen}
+            onClose={() => setBuilderOpen(false)}
+            selected={selItems}
+            onDone={(ids) => ids.forEach((id) => refreshBoard(id))}
+            showNotice={showNotice}
+          />
         </main>
       </div>
     </div>

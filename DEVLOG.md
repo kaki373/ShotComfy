@@ -121,19 +121,129 @@ See `comfyui_bridge/README.md`. ⚠️ Portable ComfyUI nests the code root — 
 
 ### Right-click context menu (asset nodes)
 📂 エクスプローラで開く · 🧩 展開 (comfyui only) · ✓ OK · 🏷 属性を設定…
+— divider — 📄 複製 · ✏️ 名前を変更 · 🖼 変換[JPG|PNG] (1行/images) · 📦 フォルダへ移動 · 🗑 ゴミ箱へ削除。
+- **フォルダ作成は左ツリーの右クリック**専用（`sc:treectx` → 📁 フォルダを作成 / 📂 エクスプローラ）。
+- **フォルダへ移動**はフォルダツリーのモーダルピッカー（`MoveRows`）で移動先を選択。
+- Backend file ops (all `state.is_allowed`-guarded): `/api/file/{duplicate,rename,convert,move,delete,restore}`,
+  `/api/folder/create`. 各操作後にボード＋ツリーを更新。
+
+### Delete model — "old/" archive (NOT the OS Recycle Bin)
+⚠️ The library root can be a **network drive** (e.g. X:), which has **no Recycle Bin** — `send2trash`
+there *permanently* deletes. So it was removed. Instead:
+- **🗄 old に送る** (`Del` key / menu): moves the file/folder into an **`old/` subfolder of its own
+  folder** (`/api/file/old` → `shutil.move` to `<parent>/old/<name>`, `_uniq` on collision). Same
+  volume → instant & works on network shares, fully recoverable.
+- **Ctrl/Cmd+Z**: `undoOld` → `/api/file/restore {path, src}` moves it back from `old/` to the original.
+- **🗑 完全に削除…**: explicit permanent delete (`/api/file/delete` → `unlink`/`rmtree`), `window.confirm`
+  first, no undo.
+- Optimistic `removeNodesByPath` clears the node immediately; ReactFlow `deleteKeyCode={null}`; disabled
+  while typing. Tree right-click also offers old に送る / 完全に削除 for folders.
+
+### Undo stack + manual refresh
+- **Undo** is an in-memory stack (`undoRef`): each old-に-送る pushes `{boardId, original, moved}[]`;
+  `Ctrl+Z` pops the last batch and `/api/file/restore` moves each back from `old/` → original.
+  Session-scoped (cleared on reload), but the files stay in `old/` for manual recovery.
+- **🔄 更新** button on the canvas toolbar (`refreshAllOpen`) re-fetches all open boards in parallel and
+  relayouts once — folder scans on the network drive lag, so add/duplicate/convert results can be forced
+  to show on demand (delete/move already remove the node optimistically).
+
+### More file ops + extraction + compare + persistence
+- **PSD → JPG/PNG**: convert menu now shows for images **and** `.psd/.psb` (Pillow opens the PSD
+  composite; png path normalizes odd modes). Backend `/api/file/convert` unchanged.
+- **Video → still**: `🎬 フレーム [先頭][末尾]` extracts the first/last frame as PNG via bundled
+  **ffmpeg** (`imageio-ffmpeg`, ~84MB in the venv). Backend `/api/video/frame {path, position}`
+  (`-frames:v 1` for first; `-sseof -3 -update 1` for last).
+- **PNG → workflow**: ComfyUI-source nodes get `🧩 ワークフローを抽出（workflowsへ）` →
+  `/api/workflows/from-image` reads the PNG `workflow` (UI) + `prompt` (API) tEXt chunks and writes
+  `<name>.json` + `<name>_api.json` (immediately runnable, no ComfyUI tab needed).
+- **Compare fullscreen + zoom/pan**: `CompareOverlay` has a `⛶` fullscreen toggle; in fullscreen,
+  **wheel = cursor-anchored zoom, drag = pan** (native listeners on the stage; transform on a
+  `.cmp-zoom` wrapper). Wipe uses `clip-path` so it scales. Esc exits fullscreen.
+- **Persisted toolbar settings**: genFilter/treesByTime/continuous/showTags/gridCols/gapX/gapY saved
+  to `localStorage` (`shotcomfy.settings`) and restored on load (state + refs seeded from it).
+- ⚠️ **Background subagents can't run tools in this environment** (Read/Edit/Bash all denied; the X:
+  audit only worked because Glob happened to be allowed). Code work is done inline.
+
+### Multi-select file ops + long-name display
+- A right-click on a **selected** node acts on the **whole selection** (`menuTargets`): フォルダへ移動 /
+  old に送る / 完全に削除 all show a `（N件）` count and process every selected file. Move picker handles N
+  items; permanent-delete confirm shows the count.
+- **Long filenames**: `smartName()` middle-truncates (`CIN…_gen3.png`) so the suffix/extension stay
+  visible; `.asset-name` is 10px, 2-line clamp, break-all. Full name on hover (`title`).
+
+### C2PA caption — hover only
+`.c2pa-line` をサムネ上の絶対配置オーバーレイにし、通常は `opacity:0`、ノード hover 時のみ表示
+（Gemini の "Created by google generative ai" 等が常時出ないように）。
+
+### Output collection — save nodes only
+`run_jobs` copies back only outputs from **save nodes** (`_save_node_ids`: class_type contains
+`save`/`videocombine` → SaveImage, VHS_VideoCombine, SaveAnimated*, …) and `type=="output"`,
+covering images/gifs/videos. PreviewImage/PreviewAny temp outputs are ignored, so a preview-only
+workflow writes nothing.
+
+---
+
+## ComfyUI job builder (multi-file / multi-slot i2i・V2V)
+
+Submit selected canvas images through a chosen i2i/V2V workflow. Design agreed with user:
+
+- **Workflow formats — readable UI in, runnable API out.** The `workflows/` folder accepts both
+  ComfyUI's normal export (**UI format**, `nodes[]`, human-readable) and **API format**
+  (`Save (API Format)`). `list_workflows()` detects which (`is_api_graph`) and returns `api: bool`.
+  - **API-format** files run directly.
+  - **UI-format** files are **auto-converted in the background** (no button): `GET /api/workflows`
+    schedules `_auto_convert(name)` for any UI file lacking `<name>_api.json` (dedup via
+    `_converting`, non-blocking — listing returns in ~0.15s). Conversion uses **ComfyUI's own
+    `graphToPrompt`** via the bridge: `comfy.convert_workflow()` POSTs the UI graph to
+    `/shotcomfy/convert` → `shotcomfy.js` saves the canvas, `loadGraphData`, `graphToPrompt`, POSTs
+    the API prompt to `/shotcomfy/api_result`, restores the canvas → backend polls and writes
+    **`<name>_api.json`**. The UI entry is hidden once its `_api` sibling exists; the panel shows a
+    small "API化中…" note + auto-polls every 4s and auto-selects the `_api` version when it appears.
+    **Requires a ComfyUI restart (new bridge routes) + an open ComfyUI tab.** Glob is `*.json`;
+    `load_workflow` tries `.api.json` then `.json`.
+- **Slots = ComfyUI node titles.** Workflows are saved in API format (`workflows/*.api.json`)
+  incl. `_meta.title`. `LoadImage` / video-loader nodes become input **slots** named by their
+  title. Backend `parse_slots()` reads them, and **ordering is notation-tolerant**: a number is
+  parsed from the title so `入力1` / `input1` / `Input_1` / `in 1` all sort as slot 1 (regex
+  `_SLOT_NUM` then trailing-number fallback; unnumbered slots go last). Video covers VHS loaders
+  incl. upload variants (`VHS_LoadVideo`, `VHS_LoadVideoUpload`, …) so video inputs also work.
+- **1 job = 1 file per slot.** "入力画像が3枚 = スロット1/2/3" is exactly one job.
+- **Batch = put N files in a slot.** The **first slot (入力1) is the batch axis + output-cut
+  driver**: N files in 入力1 → N jobs. Secondary slots: 1 file = shared across jobs; N files =
+  paired **by cut (boardId)**, else by index.
+- **Output** → each job's 入力1 file's cut folder, named after the **入力1 input file** with a
+  **generation-depth** suffix: `foo → foo_gen1`, `foo_gen1 → foo_gen2`（孫＝gen2）, `foo_gen2 →
+  foo_gen3`. Same-generation collisions get `_2`/`_3` (`foo_gen1_2`). `_gen_output_name()` parses
+  a trailing `_gen<N>` (regex `_GEN_RE`) and bumps N. No manual attr needed (field removed).
+- **UI** (`components/JobBuilder.tsx`, right side panel, toggled by header ▶ ComfyUIで生成):
+  workflow dropdown → **「選択を割当」**（枚数は自動）→ **ジョブ×スロットのグリッド** → 「N ジョブを投入」。
+  - **枚数は自動**: 1ジョブの画像数 = そのWFの画像入力スロット数（`slotCount`）。手動入力なし。
+  - **割当**: キャンバス選択を**クリック順**に slotCount 枚ずつ区切り、各かたまり=1ジョブ、k番目を
+    スロットk（入力1→入力2…）へ。選択順保持のため App の `onSelectionChange` を順序維持に変更。
+  - **誘導ステップ式UI（v4）**: ①キャンバス選択がパネルの「選択中」に**即サムネ表示**（番号付き・
+    ライブ反映）→ **「＋ジョブに追加」**で選択をスロット数ごとに区切り**ジョブ確定**（押し損ね・
+    選択消失を防ぐスナップショット方式）→ ②ジョブ一覧（#・各スロットのサムネ＋スロット名・出力先・
+    個別削除・全消去）→ ③属性入力 → 「N ジョブを ComfyUI に投入」。
+  - 軸(入力1=先頭スロット)が空のジョブは投入対象外。ビルダー表示中は2枚選択時の比較オーバーレイを抑止。
+- **Run** (`run_jobs` + `POST /api/run`): per job, upload each slot file to ComfyUI
+  (`/upload/image`), set that node's `image`/`video` input, fresh seed, `/prompt`, poll
+  `/history`, download `/view`, copy into the cut folder. Per-job isolation (one failure ≠ abort).
+  Path-traversal guard on every slot path (`state.is_allowed`).
+- Sample slot-named workflow shipped: `workflows/i2i_sample.api.json` (LoadImage titled `入力1`).
 
 ---
 
 ## Endpoints (backend, /api)
 health · config · comfyui/status · tree · lineage/{id} · boards · boards/{id} · asset?path= ·
 upload · workdir · open · mode · pick-folder · reveal · expand-workflow · tags/{id} (GET/POST) ·
-queue
+queue · **workflows** (GET, slot list) · **run** (POST, multi-slot jobs)
 
 ---
 
 ## Known limitations / TODO
-1. Queue uses txt2img only — next: **i2i/Vid2V workflows + ComfyUI image upload** so generation
-   uses the cut's actual source material; then lineage of ShotComfy's own outputs is exact.
+1. ✅ Done — i2i/V2V job builder with ComfyUI image upload (see "ComfyUI job builder" above).
+   Remaining: video-slot upload uses `/upload/image` (works for images; verify VHS video upload
+   path on a real V2V workflow), and surface per-job progress while a batch runs.
 2. ProRes .mov / 16bit / EXR can't preview in-browser (Chromium) → show placeholder; proxy
    generation (h264/webp) is a planned hard requirement.
 3. Videos without C2PA (Kling, plain exports, Runway-upscaled) aren't metadata-detectable → use
