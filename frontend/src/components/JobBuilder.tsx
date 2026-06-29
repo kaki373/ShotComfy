@@ -155,7 +155,7 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
       });
       const payload: JobSpec[] = [];
       for (let i = 0; i < repeat; i++) payload.push(...base);
-      const overrides = buildPromptOverrides();
+      const overrides = promptOpen ? buildPromptOverrides() : [];
       const r = await runJobs(wf.name, payload, overrides.length ? overrides : undefined, fixSeed || undefined);
       setResp(r);
       onDone([...new Set(submittable.map((j) => j.cells[0]!.boardId))]);
@@ -256,10 +256,10 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
 
           {/* Prompt override */}
           <button
-            className={`jb-prompt-toggle${promptOpen ? " on" : ""}${Object.values(promptEdits).some(e => e.text.trim()) ? " has-edits" : ""}`}
+            className={`jb-prompt-toggle${promptOpen ? " on" : " off"}`}
             onClick={() => setPromptOpen(p => !p)}
           >
-            ✏ プロンプト {promptOpen ? "▲" : "▼"}
+            ✏ プロンプト {promptOpen ? "ON ▲" : "OFF ▼"}
           </button>
           {promptOpen && wf && (
             <div className="jb-prompt-panel">

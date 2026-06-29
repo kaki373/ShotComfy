@@ -574,7 +574,7 @@ body {
 .jb-prompt-toggle { width:100%; padding:6px 10px; font-size:12px; font-weight:600; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); cursor:pointer; text-align:left; margin:4px 0; }
 .jb-prompt-toggle:hover { border-color:var(--accent); }
 .jb-prompt-toggle.on { border-color:var(--accent); color:var(--accent); }
-.jb-prompt-toggle.has-edits { border-color:#e8c84a; color:#e8c84a; }
+.jb-prompt-toggle.off { color:var(--muted); opacity:0.6; }
 .jb-prompt-panel { display:flex; flex-direction:column; gap:8px; padding:6px; border:1px solid var(--line); border-radius:6px; background:#16161c; }
 .jb-prompt-slot { display:flex; flex-direction:column; gap:4px; }
 .jb-prompt-head { display:flex; align-items:center; gap:6px; font-size:11px; }
