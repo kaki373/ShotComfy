@@ -180,6 +180,125 @@ def parse_slots(graph: dict[str, Any]) -> list[dict[str, Any]]:
     return slots
 
 
+# Node types that consume conditioning
+_SAMPLER_TYPES = {"KSampler", "KSamplerAdvanced", "SamplerCustomAdvanced", "CFGGuider"}
+_CLIP_ENCODE = "CLIPTextEncode"
+
+def _trace_conditioning(graph: dict[str, Any], node_id: str, visited: set[str] | None = None) -> list[str]:
+    """Trace backward through conditioning chain to find CLIPTextEncode nodes."""
+    if visited is None:
+        visited = set()
+    if node_id in visited:
+        return []
+    visited.add(node_id)
+    node = graph.get(node_id)
+    if not isinstance(node, dict):
+        return []
+    ct = node.get("class_type", "")
+    if ct == _CLIP_ENCODE:
+        return [node_id]
+    found = []
+    for val in (node.get("inputs") or {}).values():
+        if isinstance(val, list) and len(val) == 2 and isinstance(val[0], str):
+            found.extend(_trace_conditioning(graph, val[0], visited))
+    return found
+
+
+def parse_prompt_slots(graph: dict[str, Any]) -> list[dict[str, Any]]:
+    """Detect prompt text inputs by tracing from sampler nodes backward to CLIPTextEncode.
+    Returns list of {node_id, field, role, text, connected, source_node_id?}."""
+    slots: list[dict[str, Any]] = []
+    seen = set()
+
+    for nid, node in graph.items():
+        if not isinstance(node, dict):
+            continue
+        ct = node.get("class_type", "")
+        if ct not in _SAMPLER_TYPES:
+            continue
+        inputs = node.get("inputs", {})
+        # Trace positive and negative conditioning
+        for role, key in [("positive", "positive"), ("negative", "negative")]:
+            ref = inputs.get(key)
+            if not isinstance(ref, list):
+                continue
+            clip_nodes = _trace_conditioning(graph, ref[0])
+            for cnid in clip_nodes:
+                if cnid in seen:
+                    continue
+                seen.add(cnid)
+                clip_node = graph[cnid]
+                clip_inputs = clip_node.get("inputs", {})
+                text_val = clip_inputs.get("text", "")
+                title = (clip_node.get("_meta") or {}).get("title") or f"CLIPTextEncode #{cnid}"
+                connected = isinstance(text_val, list)  # connected to another node
+                source_info = None
+                current_text = ""
+                if connected:
+                    # Trace the text source
+                    src_id = text_val[0]
+                    src_node = graph.get(src_id)
+                    if isinstance(src_node, dict):
+                        src_ct = src_node.get("class_type", "")
+                        src_inputs = src_node.get("inputs", {})
+                        source_info = {"node_id": src_id, "class_type": src_ct}
+                        # Try to get the initial text from latch or prefix nodes
+                        if "text" in src_inputs and isinstance(src_inputs["text"], str):
+                            current_text = src_inputs["text"]
+                else:
+                    current_text = str(text_val)
+
+                slots.append({
+                    "node_id": cnid,
+                    "field": "text",
+                    "role": role,
+                    "title": title,
+                    "text": current_text[:200],  # preview only
+                    "connected": connected,
+                    "source": source_info,
+                })
+    return slots
+
+
+def apply_prompts(graph: dict[str, Any], prompt_overrides: list[dict[str, Any]]) -> None:
+    """Apply prompt overrides to the workflow graph.
+    Each override: {node_id, mode: 'prepend'|'append'|'replace', text, override_connection?}"""
+    for ov in prompt_overrides:
+        nid = ov["node_id"]
+        mode = ov.get("mode", "append")
+        text = ov.get("text", "")
+        if not text:
+            continue
+        node = graph.get(nid)
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs", {})
+        current = inputs.get("text", "")
+
+        # If text input is a connection and user wants to override
+        if isinstance(current, list) and ov.get("override_connection"):
+            # Cut the connection, use the source node's text as base
+            src_node = graph.get(current[0])
+            if isinstance(src_node, dict):
+                src_text = src_node.get("inputs", {}).get("text", "")
+                base = src_text if isinstance(src_text, str) else ""
+            else:
+                base = ""
+            if mode == "replace":
+                inputs["text"] = text
+            elif mode == "prepend":
+                inputs["text"] = f"{text}, {base}" if base else text
+            elif mode == "append":
+                inputs["text"] = f"{base}, {text}" if base else text
+        elif isinstance(current, str):
+            if mode == "replace":
+                inputs["text"] = text
+            elif mode == "prepend":
+                inputs["text"] = f"{text}, {current}" if current else text
+            elif mode == "append":
+                inputs["text"] = f"{current}, {text}" if current else text
+
+
 def _wf_name(p: Path) -> str:
     return p.name[: -len(".api.json")] if p.name.endswith(".api.json") else p.stem
 
@@ -242,12 +361,12 @@ def list_workflows() -> list[dict[str, Any]]:
         except Exception:  # noqa: BLE001
             continue
         if is_api_graph(graph):
-            info = {"name": name, "slots": parse_slots(graph), "api": True}
+            info = {"name": name, "slots": parse_slots(graph), "prompt_slots": parse_prompt_slots(graph), "api": True}
         elif isinstance(graph, dict) and isinstance(graph.get("nodes"), list):
             # hide a UI-format file once its auto-converted <name>_api.json exists
             if (WORKFLOWS_DIR / f"{name}_api.json").exists():
                 continue
-            info = {"name": name, "slots": _ui_slots(graph), "api": False}
+            info = {"name": name, "slots": _ui_slots(graph), "prompt_slots": [], "api": False}
         else:
             continue
         # prefer an API-format entry over a UI one of the same name
@@ -284,6 +403,7 @@ async def run_jobs(
     workflow_name: str,
     jobs: list[dict[str, Any]],
     timeout: float = 300.0,
+    prompt_overrides: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Run N jobs. Each job = {board_id, slots:{node_id: file_path}}.
     Uploads each slot file to ComfyUI, sets that LoadImage/video node's input,
@@ -317,6 +437,8 @@ async def run_jobs(
 
             apply_params(graph, {})  # fresh random seed
             randomize_seeds(graph)  # randomize ALL seed nodes for cache-busting
+            if prompt_overrides:
+                apply_prompts(graph, prompt_overrides)
             submit = await comfy.queue_prompt(graph)
             prompt_id = submit.get("prompt_id")
             if not prompt_id:

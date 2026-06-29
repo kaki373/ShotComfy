@@ -69,9 +69,19 @@ export interface WorkflowSlot {
   title: string;
   kind: "image" | "video";
 }
+export interface PromptSlot {
+  node_id: string;
+  field: string;
+  role: "positive" | "negative";
+  title: string;
+  text: string;  // preview of current text
+  connected: boolean;  // true = text comes from another node (e.g. LLM)
+  source?: { node_id: string; class_type: string };
+}
 export interface WorkflowInfo {
   name: string;
   slots: WorkflowSlot[];
+  prompt_slots: PromptSlot[];
   api: boolean; // true = runnable API format; false = UI format, needs conversion
 }
 export const getWorkflows = () => fetch("/api/workflows").then(json<WorkflowInfo[]>);
@@ -98,11 +108,17 @@ export interface JobSpec {
   slots: Record<string, string>; // node_id -> file path
   attr?: string;
 }
-export const runJobs = (workflow: string, jobs: JobSpec[]) =>
+export interface PromptOverride {
+  node_id: string;
+  mode: "prepend" | "append" | "replace";
+  text: string;
+  override_connection?: boolean;
+}
+export const runJobs = (workflow: string, jobs: JobSpec[], prompt_overrides?: PromptOverride[]) =>
   fetch("/api/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workflow, jobs }),
+    body: JSON.stringify({ workflow, jobs, prompt_overrides }),
   }).then(json<QueueResp>);
 
 export interface SavedAsset {

@@ -6,6 +6,8 @@ import {
   runJobs,
   type AssetT,
   type JobSpec,
+  type PromptOverride,
+  type PromptSlot,
   type QueueResp,
   type WorkflowInfo,
 } from "../api";
@@ -72,6 +74,8 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   const [busy, setBusy] = useState(false);
   const [resp, setResp] = useState<QueueResp | null>(null);
   const [repeat, setRepeat] = useState(1);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptEdits, setPromptEdits] = useState<Record<string, { text: string; mode: "prepend" | "append" | "replace"; override: boolean }>>({});
 
   const loadWorkflows = (notify = false) => {
     getWorkflows()
@@ -120,6 +124,21 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   const removeJob = (i: number) => setJobs((prev) => prev.filter((_, k) => k !== i));
   const clearJobs = () => setJobs([]);
 
+  const buildPromptOverrides = (): PromptOverride[] => {
+    const overrides: PromptOverride[] = [];
+    for (const [nodeId, edit] of Object.entries(promptEdits)) {
+      if (edit.text.trim()) {
+        overrides.push({
+          node_id: nodeId,
+          mode: edit.mode,
+          text: edit.text,
+          override_connection: edit.override,
+        });
+      }
+    }
+    return overrides;
+  };
+
   const submittable = jobs.filter((j) => j.cells[0]); // need at least the first (output) image
   const submit = async () => {
     if (!wf || !submittable.length) return;
@@ -135,7 +154,8 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
       });
       const payload: JobSpec[] = [];
       for (let i = 0; i < repeat; i++) payload.push(...base);
-      const r = await runJobs(wf.name, payload);
+      const overrides = buildPromptOverrides();
+      const r = await runJobs(wf.name, payload, overrides.length ? overrides : undefined);
       setResp(r);
       onDone([...new Set(submittable.map((j) => j.cells[0]!.boardId))]);
       const ok = r.results.filter((x) => !x.error).length;
@@ -232,6 +252,58 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
               </>
             )}
           </div>
+
+          {/* Prompt override */}
+          <button
+            className={`jb-prompt-toggle${promptOpen ? " on" : ""}${Object.values(promptEdits).some(e => e.text.trim()) ? " has-edits" : ""}`}
+            onClick={() => setPromptOpen(p => !p)}
+          >
+            ✏ プロンプト {promptOpen ? "▲" : "▼"}
+          </button>
+          {promptOpen && wf && (
+            <div className="jb-prompt-panel">
+              {(wf.prompt_slots ?? []).length === 0 ? (
+                <div className="jb-empty">このワークフローにプロンプトスロットが見つかりません</div>
+              ) : (
+                (wf.prompt_slots ?? []).map((ps: PromptSlot) => {
+                  const key = ps.node_id;
+                  const edit = promptEdits[key] ?? { text: "", mode: "append" as const, override: false };
+                  const setEdit = (patch: Partial<typeof edit>) =>
+                    setPromptEdits(prev => ({ ...prev, [key]: { ...edit, ...patch } }));
+                  return (
+                    <div key={key} className="jb-prompt-slot">
+                      <div className="jb-prompt-head">
+                        <span className={`jb-prompt-role ${ps.role}`}>{ps.role === "positive" ? "＋" : "−"}</span>
+                        <span className="jb-prompt-title">{ps.title}</span>
+                        {ps.connected && <span className="jb-prompt-conn" title="他ノードから接続">🔗</span>}
+                      </div>
+                      {ps.text && <div className="jb-prompt-preview">{ps.text}</div>}
+                      <textarea
+                        className="jb-prompt-input"
+                        placeholder="追加プロンプト…"
+                        value={edit.text}
+                        onChange={e => setEdit({ text: e.target.value })}
+                        rows={2}
+                      />
+                      <div className="jb-prompt-opts">
+                        <select value={edit.mode} onChange={e => setEdit({ mode: e.target.value as "prepend" | "append" | "replace" })}>
+                          <option value="prepend">先頭に追加</option>
+                          <option value="append">末尾に追加</option>
+                          <option value="replace">置換</option>
+                        </select>
+                        {ps.connected && (
+                          <label className="jb-prompt-ovr">
+                            <input type="checkbox" checked={edit.override} onChange={e => setEdit({ override: e.target.checked })} />
+                            LLM出力を上書き
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
 
           {/* STEP 2 — add to jobs */}
           <button className="jb-add" disabled={selected.length === 0} onClick={addJobs}>
