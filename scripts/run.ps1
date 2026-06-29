@@ -15,13 +15,13 @@ Start-Process powershell -ArgumentList @(
     "Set-Location '$backend'; & '$venvPy' -m uvicorn app.main:app --host 127.0.0.1 --port 8799 --reload"
 )
 
-Write-Host "Starting frontend (Vite :5173)..."
+Write-Host "Starting frontend (Vite :5273)..."
 Start-Process powershell -ArgumentList @(
     "-NoExit", "-Command",
-    "Set-Location '$frontend'; npm run dev"
+    "Set-Location '$frontend'; npm.cmd run dev"
 )
 
 Write-Host ""
-Write-Host "Frontend: http://localhost:5173"
+Write-Host "Frontend: http://localhost:5273"
 Write-Host "Backend:  http://127.0.0.1:8799/api/health"
 Write-Host "(Make sure ComfyUI is running on :8188)"

@@ -59,7 +59,7 @@ Frontend (from `frontend`):
 npm run dev
 ```
 
-Open the app: **http://localhost:5173**
+Open the app: **http://localhost:5273**
 (The Vite dev server proxies `/api` to the backend on `:8799`.)
 
 ## Optional: ComfyUI bridge (live workflow expand)
@@ -71,6 +71,6 @@ falls back to saving the workflow into ComfyUI's `user/default/workflows/`.
 ## Ports
 | Service | Port |
 |---------|------|
-| Frontend (Vite) | 5173 |
+| Frontend (Vite) | 5273 |
 | Backend (FastAPI) | 8799 |
 | ComfyUI (separate) | 8188 |

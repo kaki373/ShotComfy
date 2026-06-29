@@ -39,7 +39,7 @@ app = FastAPI(title="ShotComfy", version="0.0.1")
 
 app.add_middleware(
     CORSMiddleware,
-    # Vite dev may fall back to 5174+ if 5173 is taken; allow any localhost port.
+    # Vite dev normally runs on 5273; allow localhost overrides during development.
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_methods=["*"],
     allow_headers=["*"],

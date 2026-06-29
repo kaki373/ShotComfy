@@ -36,7 +36,7 @@ ShotComfy/
   scripts/setup.ps1, run.ps1 ; SETUP.md
 ```
 
-Ports: frontend Vite 5173 (proxies /api → 8799), backend 8799, ComfyUI 8188 (separate).
+Ports: frontend Vite 5273 (proxies /api → 8799), backend 8799, ComfyUI 8188 (separate).
 Run: `scripts/run.ps1`, or backend `uvicorn app.main:app --port 8799` + frontend `npm run dev`.
 
 ---

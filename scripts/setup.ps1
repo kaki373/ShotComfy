@@ -30,7 +30,7 @@ $frontend = Join-Path $root "frontend"
 if (Test-Path (Join-Path $frontend "package.json")) {
     Write-Host "[frontend] npm install..."
     Push-Location $frontend
-    npm install
+    npm.cmd install
     Pop-Location
 } else {
     Write-Host "[frontend] package.json not found yet - skipping npm install"
@@ -40,4 +40,4 @@ Write-Host ""
 Write-Host "Setup done. Next:"
 Write-Host "  1) edit config.json if needed"
 Write-Host "  2) start ComfyUI (separate)"
-Write-Host "  3) .\scripts\run.ps1   ->  open http://localhost:5173"
+Write-Host "  3) .\scripts\run.ps1   ->  open http://localhost:5273"
