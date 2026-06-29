@@ -167,6 +167,7 @@ export interface LineageNode {
   c2pa?: Record<string, string>; // extracted Content Credentials fields
   inputs: string[];
   params: Record<string, unknown>;
+  workflow?: string; // ShotComfy workflow template name embedded in PNG
 }
 export interface LineageEdge {
   from: string;

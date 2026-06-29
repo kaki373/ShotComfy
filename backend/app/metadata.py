@@ -147,6 +147,9 @@ def read_meta(path: str) -> dict[str, Any]:
             res["params"] = {"sampler": sampler, "model": model}
             res["kind"] = "vid2v" if has_video else "i2i" if seen else "txt2img"
 
+        if "shotcomfy_workflow" in text:
+            res["workflow"] = text["shotcomfy_workflow"]
+
         res["source"] = _detect_source(path, im, res["has_comfy"])
         res["generated"] = res["source"] in ("comfyui", "gemini")
         try:
@@ -214,8 +217,7 @@ def build_lineage(board: Any) -> dict[str, Any]:
         else:
             meta = {"has_comfy": False, "inputs": [], "params": {}, "kind": a.kind,
                     "source": "", "generated": False}
-        nodes.append(
-            {
+        node_data: dict[str, Any] = {
                 "name": a.name,
                 "kind": meta.get("kind", a.kind),
                 "has_comfy": meta.get("has_comfy", False),
@@ -224,8 +226,10 @@ def build_lineage(board: Any) -> dict[str, Any]:
                 "c2pa": meta.get("c2pa", {}),
                 "inputs": meta.get("inputs", []),
                 "params": meta.get("params", {}),
-            }
-        )
+        }
+        if "workflow" in meta:
+            node_data["workflow"] = meta["workflow"]
+        nodes.append(node_data)
         for ref in meta.get("inputs", []):
             src = by_lower.get(ref.lower())
             if src and src != a.name:

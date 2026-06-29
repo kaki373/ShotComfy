@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import io
 import json
 import random
 import re
 import time
 from pathlib import Path
 from typing import Any
+
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
 
 from .comfyui import ComfyUI
 from .config import REPO_ROOT
@@ -61,6 +65,17 @@ def apply_params(graph: dict[str, Any], params: dict[str, Any]) -> dict[str, Any
     if "ckpt" in params:
         setin(NODE_CKPT, "ckpt_name", params["ckpt"])
     return graph
+
+
+def _save_png_with_workflow(data: bytes, dest: Path, workflow_name: str) -> None:
+    """Write PNG bytes to *dest*, injecting a shotcomfy_workflow tEXt chunk
+    while preserving all existing ComfyUI metadata (prompt, workflow, etc.)."""
+    img = Image.open(io.BytesIO(data))
+    meta = PngInfo()
+    for k, v in getattr(img, "text", {}).items():
+        meta.add_text(k, v)
+    meta.add_text("shotcomfy_workflow", workflow_name)
+    img.save(str(dest), pnginfo=meta)
 
 
 def randomize_seeds(graph: dict[str, Any], *, exclude: set[str] | None = None) -> None:
@@ -326,7 +341,10 @@ async def run_jobs(
                 # write sequentially so the next image picks the following _gen number
                 name = _gen_output_name(Path(board.path), stem, ext)
                 dest = Path(board.path) / name
-                dest.write_bytes(data)
+                if ext.lower() == ".png":
+                    _save_png_with_workflow(data, dest, workflow_name)
+                else:
+                    dest.write_bytes(data)
                 copied.append(str(dest))
             results.append({"board": board_id, "prompt_id": prompt_id, "outputs": copied})
         except Exception as e:  # noqa: BLE001 - isolate per job
@@ -343,6 +361,7 @@ async def run_queue(
     timeout: float = 240.0,
 ) -> list[dict[str, Any]]:
     base = workflow if isinstance(workflow, dict) else load_workflow(workflow)
+    wf_name = workflow if isinstance(workflow, str) else "unknown"
     attr = str(params.get("attr", "gen"))
     results: list[dict[str, Any]] = []
 
@@ -380,7 +399,10 @@ async def run_queue(
                 ext = Path(img["filename"]).suffix
                 a = attr if len(images) == 1 else f"{attr}{i + 1}"
                 dest = Path(board.path) / library.output_name(bid, a, ext)
-                dest.write_bytes(data)
+                if ext.lower() == ".png":
+                    _save_png_with_workflow(data, dest, wf_name)
+                else:
+                    dest.write_bytes(data)
                 copied.append(str(dest))
 
             results.append({"board": bid, "prompt_id": prompt_id, "outputs": copied})

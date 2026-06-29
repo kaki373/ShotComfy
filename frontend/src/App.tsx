@@ -366,11 +366,13 @@ function buildBoardGraph(
   const genByName = new Map<string, boolean>();
   const sourceByName = new Map<string, string>();
   const c2paByName = new Map<string, Record<string, string>>();
+  const workflowByName = new Map<string, string>();
   for (const n of lineage?.nodes ?? []) {
     kindByName.set(n.name, n.kind);
     genByName.set(n.name, n.generated);
     sourceByName.set(n.name, n.source);
     if (n.c2pa && Object.keys(n.c2pa).length) c2paByName.set(n.name, n.c2pa);
+    if (n.workflow) workflowByName.set(n.name, n.workflow);
   }
   // origin for node tinting: a manual tag wins; else generator filename (e.g. ComfyUI_Upscale
   // even after a Photoshop round-trip strips the prompt), else backend metadata.
@@ -509,6 +511,7 @@ function buildBoardGraph(
         ok: tags[a.name]?.ok,
         labels: tags[a.name]?.labels,
         c2pa: c2paByName.get(a.name),
+        workflow: workflowByName.get(a.name),
         compact: !connected.has(a.name),
       } satisfies AssetNodeData,
     });
