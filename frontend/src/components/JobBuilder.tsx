@@ -282,7 +282,6 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
               <div className="jb-namehint">出力名：入力ファイル名 + <b>_gen1</b>（再生成は _gen2, _gen3…）</div>
               <div className="jb-repeat">
                 <label>繰り返し</label>
-                <button onClick={() => setRepeat((n) => Math.max(1, n - 1))}>−</button>
                 <input
                   type="number"
                   min={1}
@@ -290,7 +289,6 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
                   value={repeat}
                   onChange={(e) => setRepeat(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
                 />
-                <button onClick={() => setRepeat((n) => Math.min(50, n + 1))}>+</button>
                 <span>回</span>
               </div>
               <button className="jb-go" disabled={busy || submittable.length === 0} onClick={submit}>

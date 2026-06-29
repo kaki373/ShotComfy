@@ -46,18 +46,21 @@ export function CompareOverlay({
     }
   }, [full]);
 
-  // Escape exits fullscreen first (without closing the whole panel)
+  // Escape exits fullscreen first; Space toggles A/B in switch mode
   useEffect(() => {
-    if (!full) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && full) {
         e.stopPropagation();
         setFull(false);
+      }
+      if (e.key === " " && mode === "switch") {
+        e.preventDefault();
+        setShowA((s) => !s);
       }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [full]);
+  }, [full, mode]);
 
   // wheel-zoom (anchored at cursor) + drag-pan — native listeners, fullscreen only
   useEffect(() => {
@@ -136,8 +139,14 @@ export function CompareOverlay({
         <span className="compare-title">A/B overlay{full ? `  ·  ${Math.round(scale * 100)}%` : ""}</span>
         <div className="compare-modes">
           {MODES.map((m) => (
-            <button key={m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}>
-              {m}
+            <button key={m} className={mode === m ? "on" : ""} onClick={() => {
+              if (m === "switch" && mode === "switch") {
+                setShowA((s) => !s);
+              } else {
+                setMode(m);
+              }
+            }}>
+              {m === "switch" && mode === "switch" ? (showA ? "switch:A" : "switch:B") : m}
             </button>
           ))}
         </div>
@@ -163,11 +172,7 @@ export function CompareOverlay({
         </div>
       </div>
 
-      {mode === "switch" ? (
-        <button className="cmp-switch" onClick={() => setShowA((s) => !s)}>
-          {showA ? "A" : "B"} を表示中 — クリックで切替
-        </button>
-      ) : (
+      {mode !== "switch" && (
         <input
           className="cmp-slider"
           type="range"

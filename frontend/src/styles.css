@@ -295,8 +295,6 @@ body {
   transform: translateX(-1px); pointer-events: none;
 }
 .cmp-slider { width: 100%; margin: 8px 0 4px; }
-.cmp-switch { width:100%; margin:8px 0 4px; padding:6px; font-size:13px; font-weight:600; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); cursor:pointer; }
-.cmp-switch:hover { border-color:var(--accent); color:var(--accent); }
 .compare-legend { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
 
 /* folder button */
@@ -549,8 +547,6 @@ body {
 .jb-namehint b { color: var(--text); }
 .jb-repeat { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px; color:var(--muted); }
 .jb-repeat input { width:56px; padding:6px 8px; background:var(--panel); border:1px solid var(--line); border-radius:6px; color:var(--text); text-align:center; font-size:15px; font-weight:600; }
-.jb-repeat button { width:32px; height:32px; font-size:18px; font-weight:700; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; }
-.jb-repeat button:hover { border-color:var(--accent); color:var(--accent); }
 .jb-wfrow { display: flex; gap: 4px; align-items: stretch; }
 .jb-wfrow .jb-wfsel { flex: 1; min-width: 0; }
 .jb-reload {
