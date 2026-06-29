@@ -627,7 +627,7 @@ def expand_workflow(req: ExpandRequest) -> dict[str, Any]:
         text = dict(getattr(Image.open(p), "text", {}) or {})
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=f"cannot read image: {e}")
-    wf = text.get("workflow")
+    wf = text.get("workflow") or text.get("prompt")
     if not wf:
         raise HTTPException(status_code=400, detail="この画像にComfyUIワークフローがありません")
     base = state.cfg["comfyui"]["base_url"]
