@@ -424,6 +424,7 @@ async def run_jobs(
     jobs: list[dict[str, Any]],
     timeout: float = 300.0,
     prompt_overrides: list[dict[str, Any]] | None = None,
+    fix_seed: bool = False,
 ) -> list[dict[str, Any]]:
     """Run N jobs. Each job = {board_id, slots:{node_id: file_path}}.
     Uploads each slot file to ComfyUI, sets that LoadImage/video node's input,
@@ -457,7 +458,8 @@ async def run_jobs(
                 ins["video" if _slot_kind(node.get("class_type", "")) == "video" else "image"] = ref
 
             apply_params(graph, {})  # fresh random seed
-            randomize_seeds(graph)  # randomize ALL seed nodes for cache-busting
+            if not fix_seed:
+                randomize_seeds(graph)
             if prompt_overrides:
                 apply_prompts(graph, prompt_overrides)
             submit = await comfy.queue_prompt(graph)

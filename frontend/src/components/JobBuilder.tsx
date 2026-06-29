@@ -76,6 +76,7 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   const [repeat, setRepeat] = useState(1);
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptEdits, setPromptEdits] = useState<Record<string, { text: string; mode: "prepend" | "append" | "replace"; override: boolean }>>({});
+  const [fixSeed, setFixSeed] = useState(false);
 
   const loadWorkflows = (notify = false) => {
     getWorkflows()
@@ -155,7 +156,7 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
       const payload: JobSpec[] = [];
       for (let i = 0; i < repeat; i++) payload.push(...base);
       const overrides = buildPromptOverrides();
-      const r = await runJobs(wf.name, payload, overrides.length ? overrides : undefined);
+      const r = await runJobs(wf.name, payload, overrides.length ? overrides : undefined, fixSeed || undefined);
       setResp(r);
       onDone([...new Set(submittable.map((j) => j.cells[0]!.boardId))]);
       const ok = r.results.filter((x) => !x.error).length;
@@ -304,6 +305,14 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
               )}
             </div>
           )}
+
+          {/* Seed control */}
+          <div className="jb-seed">
+            <label className={fixSeed ? "on" : ""}>
+              <input type="checkbox" checked={fixSeed} onChange={(e) => setFixSeed(e.target.checked)} />
+              シード固定（ワークフローの値を使用）
+            </label>
+          </div>
 
           {/* STEP 2 — add to jobs */}
           <button className="jb-add" disabled={selected.length === 0} onClick={addJobs}>

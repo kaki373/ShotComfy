@@ -114,11 +114,11 @@ export interface PromptOverride {
   text: string;
   override_connection?: boolean;
 }
-export const runJobs = (workflow: string, jobs: JobSpec[], prompt_overrides?: PromptOverride[]) =>
+export const runJobs = (workflow: string, jobs: JobSpec[], prompt_overrides?: PromptOverride[], fix_seed?: boolean) =>
   fetch("/api/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workflow, jobs, prompt_overrides }),
+    body: JSON.stringify({ workflow, jobs, prompt_overrides, fix_seed }),
   }).then(json<QueueResp>);
 
 export interface SavedAsset {

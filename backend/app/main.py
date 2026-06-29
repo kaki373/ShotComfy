@@ -489,6 +489,7 @@ class RunRequest(BaseModel):
     workflow: str
     jobs: list[JobSpec]
     prompt_overrides: list[dict[str, Any]] | None = None
+    fix_seed: bool | None = None
 
 
 @app.post("/api/run")
@@ -507,6 +508,7 @@ async def run(req: RunRequest) -> dict[str, Any]:
             req.workflow,
             [j.model_dump() for j in req.jobs],
             prompt_overrides=req.prompt_overrides,
+            fix_seed=bool(req.fix_seed),
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
