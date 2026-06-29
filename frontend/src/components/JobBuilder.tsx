@@ -71,6 +71,7 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [resp, setResp] = useState<QueueResp | null>(null);
+  const [repeat, setRepeat] = useState(1);
 
   const loadWorkflows = (notify = false) => {
     getWorkflows()
@@ -125,13 +126,15 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
     setBusy(true);
     setResp(null);
     try {
-      const payload: JobSpec[] = submittable.map((j) => {
+      const base: JobSpec[] = submittable.map((j) => {
         const sl: Record<string, string> = {};
         slots.forEach((s, k) => {
           if (j.cells[k]) sl[s.node_id] = j.cells[k]!.asset.path;
         });
         return { board_id: j.cells[0]!.boardId, slots: sl };
       });
+      const payload: JobSpec[] = [];
+      for (let i = 0; i < repeat; i++) payload.push(...base);
       const r = await runJobs(wf.name, payload);
       setResp(r);
       onDone([...new Set(submittable.map((j) => j.cells[0]!.boardId))]);
@@ -277,8 +280,19 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
               {/* STEP 3 — submit */}
               <div className="jb-step">③ 投入</div>
               <div className="jb-namehint">出力名：入力ファイル名 + <b>_gen1</b>（再生成は _gen2, _gen3…）</div>
+              <div className="jb-repeat">
+                <label>繰り返し</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={repeat}
+                  onChange={(e) => setRepeat(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+                />
+                <span>回</span>
+              </div>
               <button className="jb-go" disabled={busy || submittable.length === 0} onClick={submit}>
-                {busy ? "生成中…" : `${submittable.length} ジョブを ComfyUI に投入`}
+                {busy ? "生成中…" : `${submittable.length * repeat} ジョブを ComfyUI に投入`}
               </button>
             </>
           )}
