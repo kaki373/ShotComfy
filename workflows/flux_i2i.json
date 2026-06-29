@@ -1023,59 +1023,6 @@
       ]
     },
     {
-      "id": 204,
-      "type": "CLIPTextEncode",
-      "pos": [
-        604.6464063898175,
-        1732.8964806521597
-      ],
-      "size": [
-        339.66049806807246,
-        199.9537090863996
-      ],
-      "flags": {},
-      "order": 32,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 319
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "slot_index": 0,
-          "links": []
-        }
-      ],
-      "title": "CLIP Text Encode (Positive Prompt)",
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.8.2",
-        "Node name for S&R": "CLIPTextEncode",
-        "enableTabs": false,
-        "tabWidth": 65,
-        "tabXOffset": 10,
-        "hasSecondTab": false,
-        "secondTabText": "Send Back",
-        "secondTabOffset": 80,
-        "secondTabWidth": 65,
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.7",
-          "input_ue_unconnectable": {}
-        }
-      },
-      "widgets_values": [
-        "霧、モノクロ、白黒,fog,mist,long grass,"
-      ],
-      "color": "#232",
-      "bgcolor": "#353"
-    },
-    {
       "id": 169,
       "type": "VAELoader",
       "pos": [
@@ -1861,108 +1808,6 @@
       "widgets_values": [
         -2
       ]
-    },
-    {
-      "id": 182,
-      "type": "CLIPTextEncode",
-      "pos": [
-        -1903.9665584678019,
-        2394.5250108177966
-      ],
-      "size": [
-        400,
-        200
-      ],
-      "flags": {},
-      "order": 51,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 311
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "links": [
-            302
-          ]
-        }
-      ],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.3.48",
-        "Node name for S&R": "CLIPTextEncode"
-      },
-      "widgets_values": [
-        "(low quality, worst quality:1.4),cgi,text,signature,watermark,huge tree.stream,   low quality, normal quality, blurry, jpeg artifacts,\n  watermark, signature, text, ugly, deformed,\n  flat lighting, washed out, overexposed, underexposed,\n  wrong colors, color shift,\n  3d render, photograph, photo realistic"
-      ]
-    },
-    {
-      "id": 232,
-      "type": "CLIPTextEncode",
-      "pos": [
-        -1744.3624645535463,
-        1960.4220977054242
-      ],
-      "size": [
-        404.85541194188283,
-        182.8967638208751
-      ],
-      "flags": {},
-      "order": 57,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 368
-        },
-        {
-          "name": "text",
-          "type": "STRING",
-          "widget": {
-            "name": "text"
-          },
-          "link": 372
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "slot_index": 0,
-          "links": [
-            369
-          ]
-        }
-      ],
-      "title": "CLIP Text Encode (Positive Prompt)",
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.8.2",
-        "Node name for S&R": "CLIPTextEncode",
-        "enableTabs": false,
-        "tabWidth": 65,
-        "tabXOffset": 10,
-        "hasSecondTab": false,
-        "secondTabText": "Send Back",
-        "secondTabOffset": 80,
-        "secondTabWidth": 65,
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.7",
-          "input_ue_unconnectable": {}
-        }
-      },
-      "widgets_values": [
-        ""
-      ],
-      "color": "#232",
-      "bgcolor": "#353"
     },
     {
       "id": 198,
@@ -2803,35 +2648,6 @@
         "cnr_id": "comfy-core",
         "ver": "0.19.1",
         "Node name for S&R": "VAEDecode"
-      },
-      "widgets_values": []
-    },
-    {
-      "id": 281,
-      "type": "PreviewImage",
-      "pos": [
-        -925.2608832735776,
-        1458.1587615768717
-      ],
-      "size": [
-        217.5019150972056,
-        258
-      ],
-      "flags": {},
-      "order": 63,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 472
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.19.5",
-        "Node name for S&R": "PreviewImage"
       },
       "widgets_values": []
     },
@@ -4012,62 +3828,6 @@
       "widgets_values": []
     },
     {
-      "id": 161,
-      "type": "CLIPTextEncode",
-      "pos": [
-        529.8982401814317,
-        1340.7804261364242
-      ],
-      "size": [
-        450,
-        340
-      ],
-      "flags": {},
-      "order": 31,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "clip",
-          "type": "CLIP",
-          "link": 227
-        }
-      ],
-      "outputs": [
-        {
-          "name": "CONDITIONING",
-          "type": "CONDITIONING",
-          "slot_index": 0,
-          "links": [
-            236,
-            324
-          ]
-        }
-      ],
-      "title": "CLIP Text Encode (Positive Prompt)",
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.8.2",
-        "Node name for S&R": "CLIPTextEncode",
-        "enableTabs": false,
-        "tabWidth": 65,
-        "tabXOffset": 10,
-        "hasSecondTab": false,
-        "secondTabText": "Send Back",
-        "secondTabOffset": 80,
-        "secondTabWidth": 65,
-        "ue_properties": {
-          "widget_ue_connectable": {},
-          "version": "7.7",
-          "input_ue_unconnectable": {}
-        }
-      },
-      "widgets_values": [
-        "GSN_style, ghostxl,\n delicate and refined rendering, precise visual observation, finely controlled detail, elegant surface treatment, subtle and nuanced brushwork, clean form definition, graceful tonal transitions, beautiful natural lighting, carefully shaped light and shadow, painterly contrast, rich midtone separation, gentle highlight control, soft atmospheric depth, balanced color relationships, cohesive visual harmony, tasteful texture treatment, polished image quality"
-      ],
-      "color": "#232",
-      "bgcolor": "#353"
-    },
-    {
       "id": 181,
       "type": "Power Lora Loader (rgthree)",
       "pos": [
@@ -4585,6 +4345,247 @@
         "HighresScreenshot00070.png",
         "image"
       ]
+    },
+    {
+      "id": 281,
+      "type": "PreviewImage",
+      "pos": [
+        -925.2608832735776,
+        1458.1587615768717
+      ],
+      "size": [
+        217.5019150972056,
+        258
+      ],
+      "flags": {},
+      "order": 63,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 472
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.19.5",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 182,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -1847.8230822157054,
+        2236.929288004896
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 311
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            302
+          ]
+        }
+      ],
+      "title": "CLIPテキストエンコードSDXL（Negative）",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.48",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "(low quality, worst quality:1.4),cgi,text,signature,watermark,huge tree.stream,   low quality, normal quality, blurry, jpeg artifacts,\n  watermark, signature, text, ugly, deformed,\n  flat lighting, washed out, overexposed, underexposed,\n  wrong colors, color shift,\n  3d render, photograph, photo realistic"
+      ]
+    },
+    {
+      "id": 232,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -1804.0518445689318,
+        1995.1916540510213
+      ],
+      "size": [
+        404.85541194188283,
+        182.8967638208751
+      ],
+      "flags": {},
+      "order": 57,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 368
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 372
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            369
+          ]
+        }
+      ],
+      "title": "CLIP Text EncodeSDXL (Positive Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.8.2",
+        "Node name for S&R": "CLIPTextEncode",
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.7",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        ""
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 161,
+      "type": "CLIPTextEncode",
+      "pos": [
+        517.3622167758601,
+        1294.2180534871586
+      ],
+      "size": [
+        450,
+        340
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 227
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": [
+            236,
+            324
+          ]
+        }
+      ],
+      "title": "CLIP Text Encode Flux (Positive Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.8.2",
+        "Node name for S&R": "CLIPTextEncode",
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.7",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "GSN_style, ghostxl,\n delicate and refined rendering, precise visual observation, finely controlled detail, elegant surface treatment, subtle and nuanced brushwork, clean form definition, graceful tonal transitions, beautiful natural lighting, carefully shaped light and shadow, painterly contrast, rich midtone separation, gentle highlight control, soft atmospheric depth, balanced color relationships, cohesive visual harmony, tasteful texture treatment, polished image quality"
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 204,
+      "type": "CLIPTextEncode",
+      "pos": [
+        610.7011563442097,
+        1768.5522303835808
+      ],
+      "size": [
+        339.66049806807246,
+        199.9537090863996
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 319
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "slot_index": 0,
+          "links": []
+        }
+      ],
+      "title": "CLIP Text Encode Flux (Negative Prompt)",
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.8.2",
+        "Node name for S&R": "CLIPTextEncode",
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.7",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "霧、モノクロ、白黒,fog,mist,long grass,"
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
     }
   ],
   "links": [
@@ -5537,10 +5538,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.8390545288825018,
+      "scale": 0.47362440744772816,
       "offset": [
-        1337.7040314695619,
-        -2723.8017193224737
+        1869.788260797621,
+        -219.71792555461184
       ]
     },
     "frontendVersion": "1.42.14",

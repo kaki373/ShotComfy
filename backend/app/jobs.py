@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from PIL import Image
+from PIL import Image, ImageColor
 from PIL.PngImagePlugin import PngInfo
 
 from .comfyui import ComfyUI
@@ -76,6 +76,26 @@ def _save_png_with_workflow(data: bytes, dest: Path, workflow_name: str) -> None
         meta.add_text(k, v)
     meta.add_text("shotcomfy_workflow", workflow_name)
     img.save(str(dest), pnginfo=meta)
+
+
+_ALPHA_BG = (128, 128, 128)
+
+
+def _flatten_alpha(data: bytes, filename: str) -> bytes:
+    """If the image has alpha, composite onto mid-gray and return PNG bytes."""
+    if not filename.lower().endswith(".png"):
+        return data
+    try:
+        img = Image.open(io.BytesIO(data))
+        if img.mode != "RGBA":
+            return data
+        bg = Image.new("RGB", img.size, _ALPHA_BG)
+        bg.paste(img, mask=img.split()[3])
+        buf = io.BytesIO()
+        bg.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return data
 
 
 def randomize_seeds(graph: dict[str, Any], *, exclude: set[str] | None = None) -> None:
@@ -428,7 +448,8 @@ async def run_jobs(
                 node = graph.get(node_id)
                 if not isinstance(node, dict):
                     continue
-                up = await comfy.upload_image(Path(path).read_bytes(), Path(path).name)
+                raw = Path(path).read_bytes()
+                up = await comfy.upload_image(_flatten_alpha(raw, Path(path).name), Path(path).name)
                 name = up.get("name", Path(path).name)
                 sub = up.get("subfolder", "")
                 ref = f"{sub}/{name}" if sub else name

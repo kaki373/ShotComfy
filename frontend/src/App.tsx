@@ -425,7 +425,8 @@ function buildBoardGraph(
     }
     const norm = new Map<string, { x: number; y: number }>();
     for (const [n, p] of pos) norm.set(n, { x: p.x - minX, y: p.y - minY });
-    const minMtime = Math.min(...c.map((n) => mtimeByName.get(n) ?? 0));
+    const genTimes = c.filter((n) => genByName.get(n)).map((n) => mtimeByName.get(n) ?? Infinity);
+    const minMtime = genTimes.length ? Math.min(...genTimes) : Math.min(...c.map((n) => mtimeByName.get(n) ?? 0));
     return { pos: norm, w: maxX - minX, h: maxY - minY, minMtime };
   });
 
