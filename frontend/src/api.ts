@@ -51,6 +51,17 @@ async function json<T>(r: Response): Promise<T> {
 
 export const getConfig = () => fetch("/api/config").then(json<ConfigT>);
 export const getComfyStatus = () => fetch("/api/comfyui/status").then(json<ComfyStatus>);
+export interface ComfyQueue { running: number; pending: number }
+export const getComfyQueue = async (): Promise<ComfyQueue> => {
+  try {
+    const cfg = await getConfig();
+    const r = await fetch(`${cfg.comfyui_url}/queue`);
+    const d = await r.json();
+    return { running: (d.queue_running ?? []).length, pending: (d.queue_pending ?? []).length };
+  } catch {
+    return { running: 0, pending: 0 };
+  }
+};
 export const getBoards = () => fetch("/api/boards").then(json<BoardSummary[]>);
 // board id may contain "/" (e.g. "01/001"); the backend route is a path param.
 export const getBoard = (id: string) => fetch(`/api/boards/${id}`).then(json<BoardDetail>);

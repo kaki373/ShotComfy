@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   assetUrl,
+  getComfyQueue,
   getWorkflows,
   openWorkflowsFolder,
   runJobs,
   type AssetT,
+  type ComfyQueue,
   type JobSpec,
   type PromptOverride,
   type PromptSlot,
@@ -71,9 +73,10 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   const [workflows, setWorkflows] = useState<WorkflowInfo[]>([]);
   const [wfName, setWfName] = useState("");
   const [jobs, setJobs] = useState<JobRow[]>([]);
-  const [busy, setBusy] = useState(false);
   const [resp, setResp] = useState<QueueResp | null>(null);
   const [repeat, setRepeat] = useState(1);
+  const [inflight, setInflight] = useState(0);
+  const [comfyQ, setComfyQ] = useState<ComfyQueue>({ running: 0, pending: 0 });
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptEdits, setPromptEdits] = useState<Record<string, { text: string; mode: "prepend" | "append" | "replace"; override: boolean }>>({});
   const [fixSeed, setFixSeed] = useState(false);
@@ -99,6 +102,15 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   useEffect(() => {
     if (open) loadWorkflows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // poll ComfyUI queue count while panel is open
+  useEffect(() => {
+    if (!open) return;
+    const poll = () => getComfyQueue().then(setComfyQ).catch(() => {});
+    poll();
+    const t = setInterval(poll, 2000);
+    return () => clearInterval(t);
   }, [open]);
 
   // while a UI-format workflow is pending auto-conversion, poll so its _api appears on its own
@@ -141,31 +153,34 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
   };
 
   const submittable = jobs.filter((j) => j.cells[0]); // need at least the first (output) image
-  const submit = async () => {
+  const submit = () => {
     if (!wf || !submittable.length) return;
-    setBusy(true);
-    setResp(null);
-    try {
-      const base: JobSpec[] = submittable.map((j) => {
-        const sl: Record<string, string> = {};
-        slots.forEach((s, k) => {
-          if (j.cells[k]) sl[s.node_id] = j.cells[k]!.asset.path;
-        });
-        return { board_id: j.cells[0]!.boardId, slots: sl };
+    const base: JobSpec[] = submittable.map((j) => {
+      const sl: Record<string, string> = {};
+      slots.forEach((s, k) => {
+        if (j.cells[k]) sl[s.node_id] = j.cells[k]!.asset.path;
       });
-      const payload: JobSpec[] = [];
-      for (let i = 0; i < repeat; i++) payload.push(...base);
-      const overrides = promptOpen ? buildPromptOverrides() : [];
-      const r = await runJobs(wf.name, payload, overrides.length ? overrides : undefined, fixSeed || undefined);
-      setResp(r);
-      onDone([...new Set(submittable.map((j) => j.cells[0]!.boardId))]);
-      const ok = r.results.filter((x) => !x.error).length;
-      showNotice(`生成完了：${ok}/${r.results.length} ジョブ成功`);
-    } catch (e) {
-      setResp({ workflow: wf.name, results: [{ board: "?", error: String(e) }] });
-    } finally {
-      setBusy(false);
-    }
+      return { board_id: j.cells[0]!.boardId, slots: sl };
+    });
+    const payload: JobSpec[] = [];
+    for (let i = 0; i < repeat; i++) payload.push(...base);
+    const overrides = promptOpen ? buildPromptOverrides() : [];
+    const count = payload.length;
+    setInflight((n) => n + count);
+    showNotice(`${count} ジョブを投入中…`);
+    runJobs(wf.name, payload, overrides.length ? overrides : undefined, fixSeed || undefined)
+      .then((r) => {
+        setResp(r);
+        onDone([...new Set(submittable.map((j) => j.cells[0]!.boardId))]);
+        const ok = r.results.filter((x) => !x.error).length;
+        showNotice(`生成完了：${ok}/${r.results.length} ジョブ成功`);
+      })
+      .catch((e) => {
+        setResp({ workflow: wf.name, results: [{ board: "?", error: String(e) }] });
+      })
+      .finally(() => {
+        setInflight((n) => Math.max(0, n - count));
+      });
   };
 
   if (!open) return null;
@@ -372,8 +387,13 @@ export default function JobBuilder({ open, onClose, selected, onDone, showNotice
                 />
                 <span>回</span>
               </div>
-              <button className="jb-go" disabled={busy || submittable.length === 0} onClick={submit}>
-                {busy ? "生成中…" : `${submittable.length * repeat} ジョブを ComfyUI に投入`}
+              {(comfyQ.running > 0 || comfyQ.pending > 0 || inflight > 0) && (
+                <div className="jb-queue-status">
+                  ComfyUI: {comfyQ.running > 0 ? `${comfyQ.running}件 実行中` : ""}{comfyQ.pending > 0 ? ` ${comfyQ.pending}件 待機` : ""}{inflight > 0 ? ` (投入中${inflight})` : ""}
+                </div>
+              )}
+              <button className="jb-go" disabled={submittable.length === 0} onClick={submit}>
+                {`${submittable.length * repeat} ジョブを ComfyUI に投入`}
               </button>
             </>
           )}

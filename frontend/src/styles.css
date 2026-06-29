@@ -562,6 +562,7 @@ body {
 .jb-convert-b { font-size: 11px; color: var(--muted); line-height: 1.5; }
 .jb-convert-go { background: #f0c674; color: #2a2413; border: 0; font-weight: 700; font-size: 13px; padding: 9px; border-radius: 7px; cursor: pointer; }
 .jb-convert-go:hover:not(:disabled) { filter: brightness(1.06); }
+.jb-queue-status { font-size:11px; color:#46d27a; padding:2px 0; }
 .jb-seed { margin:2px 0; }
 .jb-seed label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); cursor:pointer; }
 .jb-seed label.on { color:#e8c84a; }
