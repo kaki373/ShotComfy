@@ -400,21 +400,20 @@ _GEN_RE = re.compile(r"_gen(\d+)(?:_\d+)?$", re.IGNORECASE)
 
 
 def _gen_output_name(folder: Path, input_stem: str, ext: str) -> str:
-    """Name an output after its input file, bumping the generation number by depth:
-    foo -> foo_gen1, foo_gen1 -> foo_gen2, foo_gen2 -> foo_gen3. Same-generation
-    collisions get a _2/_3 suffix (e.g. foo_gen1_2)."""
+    """Name an output after its input file, bumping the generation number.
+    Always uses max existing number + 1 so deleted files are never reused:
+    foo -> foo_gen1, delete foo_gen1, next -> foo_gen2 (not foo_gen1 again)."""
     m = _GEN_RE.search(input_stem)
-    if m:
-        base, gen = input_stem[: m.start()], int(m.group(1)) + 1
-    else:
-        base, gen = input_stem, 1
-    cand = f"{base}_gen{gen}{ext}"
-    if not (folder / cand).exists():
-        return cand
-    k = 2
-    while (folder / f"{base}_gen{gen}_{k}{ext}").exists():
-        k += 1
-    return f"{base}_gen{gen}_{k}{ext}"
+    base = input_stem[: m.start()] if m else input_stem
+    # scan folder for the highest existing gen number with this base
+    pat = re.compile(re.escape(base) + r"_gen(\d+)", re.IGNORECASE)
+    max_gen = 0
+    for p in folder.iterdir():
+        gm = pat.search(p.stem)
+        if gm:
+            max_gen = max(max_gen, int(gm.group(1)))
+    gen = max_gen + 1
+    return f"{base}_gen{gen}{ext}"
 
 
 async def run_jobs(
