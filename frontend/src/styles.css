@@ -233,7 +233,7 @@ body {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
 }
-.wf-badge { position:absolute; top:22px; right:4px; font-size:9px; padding:1px 5px; border-radius:3px; color:#d4d4d8; white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis; pointer-events:none; z-index:2; }
+.wf-badge { position:absolute; bottom:2px; left:4px; font-size:8px; padding:0 2px; color:#999a; white-space:nowrap; max-width:100px; overflow:hidden; text-overflow:ellipsis; pointer-events:none; z-index:2; }
 
 /* bulk hide origin color tags */
 .tags-off .src-bar, .tags-off .src-badge, .tags-off .wf-badge { display: none !important; }

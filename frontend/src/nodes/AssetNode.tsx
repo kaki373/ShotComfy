@@ -121,11 +121,6 @@ export function AssetNode({ data, selected }: NodeProps<AssetNodeType>) {
           {srcLabel}
         </span>
       )}
-      {data.workflow && (
-        <span className="wf-badge" style={{ background: tint ? `${tint}66` : "#55555588" }}>
-          {data.workflow}
-        </span>
-      )}
       <div className="asset-preview">
         {asset.kind === "image" && (
           <img src={assetUrl(asset.path)} alt={asset.name} draggable={false} />
@@ -149,6 +144,9 @@ export function AssetNode({ data, selected }: NodeProps<AssetNodeType>) {
           <div className="c2pa-line" title={c2paFull}>
             🔏 {c2paSummary}
           </div>
+        )}
+        {data.workflow && (
+          <span className="wf-badge" title={data.workflow}>{data.workflow}</span>
         )}
       </div>
       <div className="asset-name" title={asset.name}>
