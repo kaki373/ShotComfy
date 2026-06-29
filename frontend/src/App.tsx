@@ -27,6 +27,7 @@ import { TreeView } from "./components/TreeView";
 import { layoutConnected, NODE_H, NODE_W } from "./layout";
 import {
   expandWorkflow,
+  expandWorkflowUi,
   fileConvert,
   fileDelete,
   fileDuplicate,
@@ -1318,6 +1319,24 @@ export function App() {
                   }}
                 >
                   🧩 ワークフローをComfyUIに展開
+                </button>
+              )}
+              {menu.source === "comfyui" && (
+                <button
+                  onClick={() => {
+                    expandWorkflowUi(menu.asset.path)
+                      .then((r) => {
+                        if (r.mode === "live") {
+                          showNotice(`非API版ワークフロー「${r.name}」をComfyUIに展開しました 🧩`);
+                        } else {
+                          showNotice(`非API版ワークフロー「${r.name}」をファイル保存しました`);
+                        }
+                      })
+                      .catch((e) => window.alert(`非API版展開に失敗: ${e}`));
+                    setMenu(null);
+                  }}
+                >
+                  🧩 ワークフローをComfyUIに展開(非API版)
                 </button>
               )}
               {menu.source === "comfyui" && (

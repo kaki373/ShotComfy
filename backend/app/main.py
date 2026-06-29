@@ -648,6 +648,42 @@ def expand_workflow(req: ExpandRequest) -> dict[str, Any]:
     return {"ok": True, "mode": "file", "name": name, "saved": str(wdir / name), "comfyui_url": base}
 
 
+@app.post("/api/expand-workflow-ui")
+def expand_workflow_ui(req: ExpandRequest) -> dict[str, Any]:
+    """Load the original (non-API) workflow template into ComfyUI, identified
+    by the shotcomfy_workflow name embedded in the PNG metadata."""
+    p = Path(req.path)
+    if not state.is_allowed(p):
+        raise HTTPException(status_code=403, detail="path not allowed")
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="file not found")
+    try:
+        text = dict(getattr(Image.open(p), "text", {}) or {})
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"cannot read image: {e}")
+    wf_name = text.get("shotcomfy_workflow")
+    if not wf_name:
+        raise HTTPException(status_code=400, detail="この画像にワークフロー名が埋め込まれていません")
+    ui_path = WORKFLOWS_DIR / f"{wf_name}.json"
+    if not ui_path.is_file():
+        raise HTTPException(status_code=404, detail=f"非APIワークフローが見つかりません: {wf_name}.json")
+    wf = ui_path.read_text(encoding="utf-8")
+    base = state.cfg["comfyui"]["base_url"]
+    try:
+        graph = json.loads(wf)
+        r = httpx.post(f"{base}/shotcomfy/load", json=graph, timeout=5.0)
+        if r.status_code == 200:
+            return {"ok": True, "mode": "live", "name": wf_name, "comfyui_url": base}
+    except Exception:  # noqa: BLE001
+        pass
+    install = state.cfg["comfyui"].get("install_path", "")
+    wdir = Path(install) / "user" / "default" / "workflows"
+    wdir.mkdir(parents=True, exist_ok=True)
+    dest = wdir / f"{wf_name}.json"
+    dest.write_text(wf, encoding="utf-8")
+    return {"ok": True, "mode": "file", "name": wf_name, "saved": str(dest), "comfyui_url": base}
+
+
 @app.post("/api/workflows/open")
 def open_workflows_folder() -> dict[str, Any]:
     """Open the workflows folder in the OS file explorer."""

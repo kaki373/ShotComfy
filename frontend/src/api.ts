@@ -235,6 +235,15 @@ export const expandWorkflow = (path: string) =>
     json<{ ok: boolean; mode: "live" | "file"; name?: string; saved?: string; comfyui_url: string }>,
   );
 
+export const expandWorkflowUi = (path: string) =>
+  fetch("/api/expand-workflow-ui", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  }).then(
+    json<{ ok: boolean; mode: "live" | "file"; name?: string; saved?: string; comfyui_url: string }>,
+  );
+
 export interface FileTag {
   source?: string;
   ok?: boolean;
