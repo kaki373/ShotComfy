@@ -11,6 +11,7 @@ export interface AssetNodeData extends Record<string, unknown> {
   labels?: string[]; // manual free-text labels
   c2pa?: Record<string, string>; // extracted Content Credentials
   compact?: boolean; // render narrower (standalone material, not in a tree)
+  workflow?: string; // workflow template name used to generate this asset
 }
 export type AssetNodeType = Node<AssetNodeData, "asset">;
 
@@ -118,6 +119,11 @@ export function AssetNode({ data, selected }: NodeProps<AssetNodeType>) {
       {srcLabel && (
         <span className="src-badge" style={{ background: tint ?? "#555", color: "#0b1020" }}>
           {srcLabel}
+        </span>
+      )}
+      {data.workflow && (
+        <span className="wf-badge" style={{ background: tint ? `${tint}66` : "#55555588" }}>
+          {data.workflow}
         </span>
       )}
       <div className="asset-preview">

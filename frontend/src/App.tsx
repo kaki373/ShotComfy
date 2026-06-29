@@ -56,6 +56,7 @@ import {
   type ConfigT,
   type FileTag,
   type Lineage,
+  type LineageNode,
   type TreeNode,
 } from "./api";
 
@@ -80,6 +81,78 @@ function MoveRows({
         <MoveRows key={c.path} node={c} depth={depth + 1} onPick={onPick} />
       ))}
     </>
+  );
+}
+
+// Properties dialog — shows lineage metadata for a single asset
+function PropsDialog({
+  asset,
+  boardId,
+  onClose,
+}: {
+  asset: AssetT;
+  boardId: string;
+  onClose: () => void;
+}) {
+  const [node, setNode] = useState<LineageNode | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getLineage(boardId)
+      .then((lin) => {
+        const found = lin.nodes.find((n) => n.name === asset.name) ?? null;
+        setNode(found);
+      })
+      .catch(() => setNode(null))
+      .finally(() => setLoading(false));
+  }, [boardId, asset.name]);
+
+  const row = (key: string, val: unknown) => {
+    if (val === undefined || val === null || val === "") return null;
+    return (
+      <div className="props-row" key={key}>
+        <span className="props-key">{key}</span>
+        <span className="props-val">{String(val)}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="props-overlay" onClick={onClose}>
+      <div className="props-modal" onClick={(e) => e.stopPropagation()}>
+        <h3>プロパティ: {asset.name}</h3>
+        {loading && <div style={{ color: "#888" }}>読み込み中…</div>}
+        {!loading && !node && <div style={{ color: "#888" }}>リネージ情報なし</div>}
+        {!loading && node && (
+          <>
+            {row("source", node.source)}
+            {row("kind", node.kind)}
+            {row("has_comfy", node.has_comfy ? "Yes" : "No")}
+            {node.params && Object.keys(node.params).length > 0 && (
+              <>
+                <div style={{ marginTop: 8, marginBottom: 4, color: "#8888aa", fontSize: 12 }}>
+                  パラメータ
+                </div>
+                {Object.entries(node.params).map(([k, v]) => row(k, v))}
+              </>
+            )}
+            {node.inputs.length > 0 && (
+              <>
+                <div style={{ marginTop: 8, marginBottom: 4, color: "#8888aa", fontSize: 12 }}>
+                  入力
+                </div>
+                {node.inputs.map((inp, i) => (
+                  <div className="props-row" key={i}>
+                    <span className="props-val">{inp}</span>
+                  </div>
+                ))}
+              </>
+            )}
+          </>
+        )}
+        <button onClick={onClose}>閉じる</button>
+      </div>
+    </div>
   );
 }
 
@@ -489,6 +562,7 @@ export function App() {
   const [genFilter, setGenFilter] = useState<GenFilter>(S0.genFilter);
   const genFilterRef = useRef<GenFilter>(S0.genFilter);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [propsModal, setPropsModal] = useState<{asset: AssetT; boardId: string} | null>(null);
   const [treeMenu, setTreeMenu] = useState<{ x: number; y: number; path: string; name: string } | null>(null);
   const [movePicker, setMovePicker] = useState<{ items: { asset: AssetT; boardId: string }[] } | null>(null);
   const undoRef = useRef<{ boardId: string; original: string; moved: string }[][]>([]);
@@ -1104,6 +1178,8 @@ export function App() {
             selectionKeyCode="Shift"
             deleteKeyCode={null}
             zoomOnDoubleClick={false}
+            minZoom={0.05}
+            maxZoom={8}
             fitView
           >
             <Background color="#3a3a42" gap={20} />
@@ -1275,6 +1351,13 @@ export function App() {
                 }}
               >
                 🏷 属性を設定…
+              </button>
+              <div className="ctx-div" />
+              <button onClick={() => {
+                setPropsModal({ asset: menu.asset, boardId: menu.boardId });
+                setMenu(null);
+              }}>
+                📋 プロパティ…
               </button>
 
               <div className="ctx-div" />
@@ -1542,6 +1625,14 @@ export function App() {
               current={viewer}
               onSelect={setViewer}
               onClose={() => setViewer(null)}
+            />
+          )}
+
+          {propsModal && (
+            <PropsDialog
+              asset={propsModal.asset}
+              boardId={propsModal.boardId}
+              onClose={() => setPropsModal(null)}
             />
           )}
 

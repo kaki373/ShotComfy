@@ -233,9 +233,10 @@ body {
   position: absolute; top: 6px; right: 6px; z-index: 2;
   font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px;
 }
+.wf-badge { position:absolute; top:22px; right:4px; font-size:9px; padding:1px 5px; border-radius:3px; color:#d4d4d8; white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis; pointer-events:none; z-index:2; }
 
 /* bulk hide origin color tags */
-.tags-off .src-bar, .tags-off .src-badge { display: none !important; }
+.tags-off .src-bar, .tags-off .src-badge, .tags-off .wf-badge { display: none !important; }
 .tags-off .asset-node { background: var(--panel) !important; }
 .tags-off .asset-node:not(.selected) { border-color: var(--line) !important; }
 .tags-off .asset-node.selected { border-color: var(--accent) !important; }
@@ -601,3 +602,12 @@ body {
   border: 0; border-radius: 8px; background: rgba(0,0,0,0.4); color: #fff; font-size: 22px; cursor: pointer;
 }
 .lb-close:hover { background: rgba(0,0,0,0.7); }
+
+/* properties modal */
+.props-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:900; display:flex; align-items:center; justify-content:center; }
+.props-modal { background:#1e1e26; border:1px solid #3a3a44; border-radius:10px; padding:20px 24px; min-width:360px; max-width:520px; color:#d4d4d8; font-size:13px; }
+.props-modal h3 { margin:0 0 12px; font-size:15px; color:#e4e4e8; }
+.props-modal .props-row { display:flex; gap:8px; padding:4px 0; border-bottom:1px solid #2a2a34; }
+.props-modal .props-key { color:#8888aa; min-width:80px; }
+.props-modal .props-val { color:#d4d4d8; word-break:break-all; }
+.props-modal button { margin-top:14px; padding:6px 18px; background:#3a3a50; border:1px solid #4a4a5a; border-radius:6px; color:#d4d4d8; cursor:pointer; }

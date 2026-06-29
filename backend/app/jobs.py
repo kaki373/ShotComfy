@@ -63,6 +63,22 @@ def apply_params(graph: dict[str, Any], params: dict[str, Any]) -> dict[str, Any
     return graph
 
 
+def randomize_seeds(graph: dict[str, Any], *, exclude: set[str] | None = None) -> None:
+    """Walk every node and replace seed / noise_seed with a fresh random value,
+    so ComfyUI never cache-hits on unchanged seeds."""
+    for nid, node in graph.items():
+        if exclude and nid in exclude:
+            continue
+        if not isinstance(node, dict):
+            continue
+        inputs = node.get("inputs")
+        if not isinstance(inputs, dict):
+            continue
+        for key in ("seed", "noise_seed"):
+            if key in inputs and isinstance(inputs[key], (int, float)):
+                inputs[key] = random.randint(0, 2**63 - 1)
+
+
 def _collect_images(hist: dict[str, Any]) -> list[dict[str, Any]]:
     images: list[dict[str, Any]] = []
     for node_out in hist.get("outputs", {}).values():
@@ -285,6 +301,7 @@ async def run_jobs(
                 ins["video" if _slot_kind(node.get("class_type", "")) == "video" else "image"] = ref
 
             apply_params(graph, {})  # fresh random seed
+            randomize_seeds(graph)  # randomize ALL seed nodes for cache-busting
             submit = await comfy.queue_prompt(graph)
             prompt_id = submit.get("prompt_id")
             if not prompt_id:
@@ -338,6 +355,7 @@ async def run_queue(
                 continue
 
             graph = apply_params(copy.deepcopy(base), params)
+            randomize_seeds(graph, exclude={NODE_SAMPLER} if "seed" in params else None)
             submit = await comfy.queue_prompt(graph)
             prompt_id = submit.get("prompt_id")
             node_errors = submit.get("node_errors") or {}
