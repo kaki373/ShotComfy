@@ -1631,8 +1631,8 @@ export function App() {
 
           {dragging && <div className="drop-hint">画像をドロップして配置</div>}
 
-          {compareImages && !builderOpen && (
-            <CompareOverlay a={compareImages[0]} b={compareImages[1]} onClose={() => setSelected([])} />
+          {compareImages && (
+            <CompareOverlay a={compareImages[0]} b={compareImages[1]} onClose={() => setSelected([])} besideJb={builderOpen} />
           )}
 
           {notice && (

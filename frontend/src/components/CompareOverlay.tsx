@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { assetUrl, type AssetT } from "../api";
 
-type Mode = "opacity" | "wipe" | "diff";
-const MODES: Mode[] = ["opacity", "wipe", "diff"];
+type Mode = "opacity" | "wipe" | "diff" | "switch";
+const MODES: Mode[] = ["opacity", "wipe", "diff", "switch"];
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 // Overlay (superimposed) A/B comparison: opacity blend, wipe reveal, or difference.
@@ -11,13 +11,16 @@ export function CompareOverlay({
   a,
   b,
   onClose,
+  besideJb = false,
 }: {
   a: AssetT;
   b: AssetT;
   onClose: () => void;
+  besideJb?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>("opacity");
   const [v, setV] = useState(50);
+  const [showA, setShowA] = useState(true);
   const [full, setFull] = useState(false);
   const [scale, setScale] = useState(1);
   const [off, setOff] = useState({ x: 0, y: 0 });
@@ -96,11 +99,13 @@ export function CompareOverlay({
   }, [full]);
 
   const topStyle: CSSProperties =
-    mode === "opacity"
-      ? { opacity: v / 100 }
-      : mode === "diff"
-        ? { mixBlendMode: "difference" }
-        : { clipPath: `inset(0 ${100 - v}% 0 0)` }; // wipe: reveal left v%
+    mode === "switch"
+      ? { opacity: showA ? 1 : 0 }
+      : mode === "opacity"
+        ? { opacity: v / 100 }
+        : mode === "diff"
+          ? { mixBlendMode: "difference" }
+          : { clipPath: `inset(0 ${100 - v}% 0 0)` }; // wipe: reveal left v%
 
   const panelStyle: CSSProperties | undefined = full
     ? {
@@ -126,7 +131,7 @@ export function CompareOverlay({
     : undefined;
 
   return (
-    <div className="compare-panel" style={panelStyle}>
+    <div className={`compare-panel${besideJb ? " beside-jb" : ""}`} style={panelStyle}>
       <div className="compare-head">
         <span className="compare-title">A/B overlay{full ? `  ·  ${Math.round(scale * 100)}%` : ""}</span>
         <div className="compare-modes">
@@ -158,14 +163,20 @@ export function CompareOverlay({
         </div>
       </div>
 
-      <input
-        className="cmp-slider"
-        type="range"
-        min={0}
-        max={100}
-        value={v}
-        onChange={(e) => setV(Number(e.target.value))}
-      />
+      {mode === "switch" ? (
+        <button className="cmp-switch" onClick={() => setShowA((s) => !s)}>
+          {showA ? "A" : "B"} を表示中 — クリックで切替
+        </button>
+      ) : (
+        <input
+          className="cmp-slider"
+          type="range"
+          min={0}
+          max={100}
+          value={v}
+          onChange={(e) => setV(Number(e.target.value))}
+        />
+      )}
       <div className="compare-legend">
         <span>A (top): {a.name}</span>
         <span>B (bottom): {b.name}</span>
